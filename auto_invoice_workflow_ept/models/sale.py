@@ -43,7 +43,7 @@ class saleorderline(models.Model):
     @api.multi
     def _action_procurement_create(self):
         res = super(saleorderline, self)._action_procurement_create()
-        orders = list(set(x.order_id for x in self))
+        orders = list({x.order_id for x in self})
         procurement_jit=self.env['ir.module.module'].sudo().search([('name','=','procurement_jit'),('state','=','installed')])
         if not procurement_jit:
             for order in orders:

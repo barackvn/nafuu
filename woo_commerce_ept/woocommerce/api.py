@@ -35,15 +35,11 @@ class API(object):
     def __get_url(self, endpoint):
         """ Get URL for requests """
         url = self.url
-        api = "wc-api"
-
         if url.endswith("/") is False:
-            url = "%s/" % url
+            url = f"{url}/"
 
-        if self.wp_api:
-            api = "wp-json"
-
-        return "%s%s/%s/%s" % (url, api, self.version, endpoint)
+        api = "wp-json" if self.wp_api else "wc-api"
+        return f"{url}{api}/{self.version}/{endpoint}"
 
     def __get_oauth_url(self, url, method):
         """ Generate oAuth1.0a URL """
@@ -63,8 +59,8 @@ class API(object):
         auth = None
         params = {}
         headers = {
-            "user-agent": "WooCommerce API Client-Python/%s" % __version__,
-            "accept": "application/json"
+            "user-agent": f"WooCommerce API Client-Python/{__version__}",
+            "accept": "application/json",
         }
 
         if self.is_ssl is True and self.query_string_auth is False:
@@ -80,7 +76,7 @@ class API(object):
         if data is not None:
             data = jsonencode(data, ensure_ascii=False).encode('utf-8')
             headers["content-type"] = "application/json;charset=utf-8"
-        
+
         req_time=datetime.now().strftime("%d/%m/%Y %H:%M:%S.%f")
         res = request(
             method=method,

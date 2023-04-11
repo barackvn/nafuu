@@ -127,10 +127,10 @@ class GetPostTypes(AuthenticatedMethod):
     results_class = WordPressPostType
 
     def process_result(self, raw_result):
-        result = {}
-        for name, raw_value in raw_result.items():
-            result[name] = self.results_class(raw_value)
-        return result
+        return {
+            name: self.results_class(raw_value)
+            for name, raw_value in raw_result.items()
+        }
 
 
 class GetPostType(AuthenticatedMethod):

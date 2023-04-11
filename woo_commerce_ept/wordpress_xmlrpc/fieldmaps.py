@@ -35,10 +35,7 @@ class FieldMap(object):
         """
         Convert a Python value to the expected XML-RPC value type.
         """
-        if self.conversion:
-            return self.conversion(input_value)
-        else:
-            return input_value
+        return self.conversion(input_value) if self.conversion else input_value
 
     def get_outputs(self, input_value):
         """
@@ -46,11 +43,7 @@ class FieldMap(object):
         """
         output_value = self.convert_to_xmlrpc(input_value)
 
-        output = {}
-        for name in self.output_names:
-            output[name] = output_value
-
-        return output
+        return {name: output_value for name in self.output_names}
 
 
 class IntegerFieldMap(FieldMap):
@@ -87,17 +80,10 @@ class DateTimeFieldMap(FieldMap):
             try:
                 tt = raw_value.timetuple()
             except ValueError:
-                # Workaround for a combination of Python and WordPress bug
-                # which would return a null date for Draft posts. This is not
-                # the case for recent versions of WP, but drafts created a that
-                # time still have a null date.
-                # The python bug is http://bugs.python.org/issue2623 and
-                # affects xmlrpclib when fed a timezone aware DateTime
-                if str(raw_value) == "00000000T00:00:00Z":
-                    raw_value = xmlrpc_client.DateTime("00010101T00:00:00")
-                    tt = raw_value.timetuple()
-                else:
+                if str(raw_value) != "00000000T00:00:00Z":
                     raise
+                raw_value = xmlrpc_client.DateTime("00010101T00:00:00")
+                tt = raw_value.timetuple()
             return datetime.datetime(*tuple(tt)[:6])
         elif self.default:
             return self.default
@@ -115,20 +101,16 @@ class TermsListFieldMap(FieldMap):
 
     def convert_to_python(self, xmlrpc=None):
         if xmlrpc and self.name in xmlrpc:
-            values = []
-            for value in xmlrpc.get(self.name):
-                values.append(self.object_class(value))
-            return values
+            return [self.object_class(value) for value in xmlrpc.get(self.name)]
         else:
             return []
 
     def convert_to_xmlrpc(self, input_value):
-        if input_value:
-            values = {}
-            for term in input_value:
-                if term.taxonomy not in values:
-                    values[term.taxonomy] = []
-                values[term.taxonomy].append(int(term.id))
-            return values
-        else:
+        if not input_value:
             return None
+        values = {}
+        for term in input_value:
+            if term.taxonomy not in values:
+                values[term.taxonomy] = []
+            values[term.taxonomy].append(int(term.id))
+        return values

@@ -321,10 +321,12 @@ class woo_process_import_export(models.TransientModel):
     
     @api.multi
     def import_sale_orders(self):
-        sale_order_obj=self.env['sale.order']        
+        sale_order_obj=self.env['sale.order']
         for instance in self.instance_ids:
             if not instance.import_order_status_ids:
-                raise Warning('Please select atleast one Order Status in Settings to import orders for Instance %s'%(instance.name))
+                raise Warning(
+                    f'Please select atleast one Order Status in Settings to import orders for Instance {instance.name}'
+                )
             if instance.woo_version == 'old':
                 before_date=self.past_orders_before_date
                 after_date=self.past_orders_after_date
@@ -362,17 +364,19 @@ class woo_process_import_export(models.TransientModel):
         for instance in self.instance_ids:
             for odoo_template in odoo_templates:
                 woo_categ_ids = [(6, 0, [])]
-                woo_template = woo_template_obj.search([('woo_instance_id','=',instance.id),('product_tmpl_id','=',odoo_template.id)])                
+                woo_template = woo_template_obj.search([('woo_instance_id','=',instance.id),('product_tmpl_id','=',odoo_template.id)])
                 if not woo_template:
                     categ_obj = odoo_template.categ_id or ''
                     if categ_obj.id:
                         self.create_categ_in_woo(categ_obj,instance) #create category
                         ctg = categ_obj.name.lower().replace('\'','\'\'')
-                        self._cr.execute("select id from woo_product_categ_ept where LOWER(name) = '%s' and woo_instance_id = %s limit 1"%(ctg,instance.id))
+                        self._cr.execute(
+                            f"select id from woo_product_categ_ept where LOWER(name) = '{ctg}' and woo_instance_id = {instance.id} limit 1"
+                        )
                         woo_product_categ_id = self._cr.dictfetchall()
                         woo_categ_id = False
                         if woo_product_categ_id:
-                            woo_categ_id = woo_product_categ.browse(woo_product_categ_id[0].get('id'))                        
+                            woo_categ_id = woo_product_categ.browse(woo_product_categ_id[0].get('id'))
                         if not woo_categ_id:             
                             woo_categ_id = woo_product_categ.create({'name':categ_obj.name,'woo_instance_id':instance.id})
                         else:
@@ -411,7 +415,10 @@ class woo_process_import_export(models.TransientModel):
                     parent_id = woo_product_categ.search([('name','=',categ_id.parent_id.name),('parent_id','=',woo_product_parent_categ.id),('woo_instance_id','=',instance.id)])
                     if not parent_id:
                         woo_product_categ.create({'name':categ_id.name,'woo_instance_id':instance.id})
-                    if not parent_id.parent_id.id==woo_product_category.id and woo_product_categ.instance_id.id==instance.id:
+                    if (
+                        parent_id.parent_id.id != woo_product_category.id
+                        and woo_product_categ.instance_id.id == instance.id
+                    ):
                         woo_product_category.write({'parent_id':parent_id.id})
         return True
     
@@ -509,41 +516,46 @@ class woo_process_import_export(models.TransientModel):
     
     @api.multi
     def filter_templates(self,woo_templates):
-        filter_templates=[]
-        for woo_template in woo_templates:
-            if not self.env['woo.product.product.ept'].search([('woo_template_id','=',woo_template.id),('default_code','=',False)]):
-                filter_templates.append(woo_template)
-        return filter_templates    
+        return [
+            woo_template
+            for woo_template in woo_templates
+            if not self.env['woo.product.product.ept'].search(
+                [
+                    ('woo_template_id', '=', woo_template.id),
+                    ('default_code', '=', False),
+                ]
+            )
+        ]    
     
     @api.multi
     def export_products(self):
         instance_settings = {}
         config_settings = {}
-        
+
         is_set_price = False
         is_set_stock = False
         is_set_image = False
         is_publish = False
-        
+
         woo_product_tmpl_obj=self.env['woo.product.template.ept']
         if self._context.get('process')=='export_products':
             woo_template_ids=self._context.get('active_ids')
             instances = self.env['woo.instance.ept'].search([('state','=','confirmed')])
-        else:            
+        else:        
             woo_template_ids=[]
             instances=self.instance_ids
             for instance in instances:
-                instance_settings.update({"instance_id":instance})
+                instance_settings["instance_id"] = instance
                 if instance.is_set_price:
-                    config_settings.update({"is_set_price":True})
+                    config_settings["is_set_price"] = True
                 if instance.is_set_stock:
-                    config_settings.update({"is_set_stock":True})
+                    config_settings["is_set_stock"] = True
                 if instance.is_set_image:
-                    config_settings.update({"is_set_image":True})
+                    config_settings["is_set_image"] = True
                 if instance.is_publish:
-                    config_settings.update({"is_publish":True})
-                instance_settings.update({"settings":config_settings})        
-        
+                    config_settings["is_publish"] = True
+                instance_settings["settings"] = config_settings        
+
         for instance in instances:
             if instance_settings:
                 setting = instance_settings.get('settings')
@@ -556,7 +568,7 @@ class woo_process_import_export(models.TransientModel):
                 is_set_stock = self.update_stock_in_product
                 is_set_image = self.update_image_in_product_export
                 is_publish = self.publish
-                                
+
             if woo_template_ids:
                 woo_templates=woo_product_tmpl_obj.search([('woo_instance_id','=',instance.id),('id','in',woo_template_ids)])
                 woo_templates=self.filter_templates(woo_templates)
@@ -607,21 +619,22 @@ class woo_process_import_export(models.TransientModel):
                 for product in products:
                     if product.woo_template_id.woo_tmpl_id==product.variant_id:
                         try:
-                            res=wcapi.get("products/%s"%(product.variant_id))
+                            res = wcapi.get(f"products/{product.variant_id}")
                             stock_data={}
-                            if res.status_code not in ['201','200']:
-                                if res.json().get('manage_stock'):
-                                    if product.product_id.type=='product':
-                                        product_qty=res.json().get('stock_quantity')
-                                        stock_data.update({'product_qty':product_qty})
-                                        stock_data.update({'product_id':product.product_id})
-                                        prodcuts_stock.append(stock_data)
-                            else:
+                            if res.status_code in ['201', '200']:
                                 transaction_log_obj.create({'message':'Import Stock for product %s has not proper response.\n Response %s'%(product.name,res.content),
                                              'mismatch_details':True,
                                              'type':'product',
                                              'woo_instance_id':instance.id
                                             })
+                            elif (
+                                res.json().get('manage_stock')
+                                and product.product_id.type == 'product'
+                            ):
+                                product_qty=res.json().get('stock_quantity')
+                                stock_data['product_qty'] = product_qty
+                                stock_data['product_id'] = product.product_id
+                                prodcuts_stock.append(stock_data)
                         except Exception as e:
                             transaction_log_obj.create({'message':'Import Stock for product %s not perfom.\n Error %s'%(product.name,e),
                                              'mismatch_details':True,
@@ -630,21 +643,24 @@ class woo_process_import_export(models.TransientModel):
                                             })
                     else:
                         try:
-                            res=wcapi.get("products/%s/variations/%s"%(product.woo_template_id.woo_tmpl_id,product.variant_id))
+                            res = wcapi.get(
+                                f"products/{product.woo_template_id.woo_tmpl_id}/variations/{product.variant_id}"
+                            )
                             stock_data={}
-                            if res.status_code not in ['201','200']:
-                                if res.json().get('manage_stock'):
-                                    if product.product_id.type=='product':
-                                        product_qty=res.json().get('stock_quantity')
-                                        stock_data.update({'product_qty':product_qty})
-                                        stock_data.update({'product_id':product.product_id})
-                                        prodcuts_stock.append(stock_data)
-                            else:
+                            if res.status_code in ['201', '200']:
                                 transaction_log_obj.create({'message':'Import Stock for product %s has not proper response.\n Response %s'%(product.name,res.content),
                                              'mismatch_details':True,
                                              'type':'product',
                                              'woo_instance_id':instance.id
                                             })
+                            elif (
+                                res.json().get('manage_stock')
+                                and product.product_id.type == 'product'
+                            ):
+                                product_qty=res.json().get('stock_quantity')
+                                stock_data['product_qty'] = product_qty
+                                stock_data['product_id'] = product.product_id
+                                prodcuts_stock.append(stock_data)
                         except Exception as e:
                             transaction_log_obj.create({'message':'Import Stock for product %s not perform.\n Error %s'%(product.name,e),
                                              'mismatch_details':True,
@@ -655,7 +671,7 @@ class woo_process_import_export(models.TransientModel):
                 product_templates=self.env['woo.product.template.ept'].search([('exported_in_woo','=',True),('woo_instance_id','=',instance.id)])
                 for product_template in product_templates:
                     try:
-                        res=wcapi.get("products/%s"%(product_template.woo_tmpl_id))
+                        res = wcapi.get(f"products/{product_template.woo_tmpl_id}")
                         if res.status_code not in ['201','200']:
                             response=res.json()
                             if instance.woo_version=='old':
@@ -665,19 +681,26 @@ class woo_process_import_export(models.TransientModel):
                                 manage_stock=response.get('managing_stock') if instance.woo_version=='old' else response.get('manage_stock')
                                 if manage_stock and product_template.product_tmpl_id.product_variant_ids.type=='product':
                                     product_qty=response.get('stock_quantity')
-                                    stock_data.update({'product_qty':product_qty})
-                                    stock_data.update({'product_id':product_template.product_tmpl_id.product_variant_ids})
+                                    stock_data['product_qty'] = product_qty
+                                    stock_data['product_id'] = product_template.product_tmpl_id.product_variant_ids
                                     prodcuts_stock.append(stock_data)
                             else:
                                 for variation in response.get('variations'):
                                     for product in product_template.product_tmpl_id.product_variant_ids:
-                                        if variation.get('sku')==product.default_code and product.type=='product': 
-                                            if variation.get('managing_stock') or variation.get('manage_stock'):
-                                                stock_data={}
-                                                product_qty=variation.get('stock_quantity')
-                                                stock_data.update({'product_qty':product_qty})
-                                                stock_data.update({'product_id':product})
-                                                prodcuts_stock.append(stock_data)
+                                        if (
+                                            variation.get('sku')
+                                            == product.default_code
+                                            and product.type == 'product'
+                                            and (
+                                                variation.get('managing_stock')
+                                                or variation.get('manage_stock')
+                                            )
+                                        ):
+                                            stock_data={}
+                                            product_qty=variation.get('stock_quantity')
+                                            stock_data['product_qty'] = product_qty
+                                            stock_data['product_id'] = product
+                                            prodcuts_stock.append(stock_data)
                         else:
                             transaction_log_obj.create({'message':'Import Stock for product %s has not proper response.\n Response %s'%(product_template.name,res.content),
                                          'mismatch_details':True,

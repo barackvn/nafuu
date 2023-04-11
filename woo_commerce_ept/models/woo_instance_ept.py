@@ -203,8 +203,7 @@ class woo_instance_ept(models.Model):
         vals = {
             'name': self.name
         }
-        global_channel = global_channel_obj.create(vals)
-        return global_channel
+        return global_channel_obj.create(vals)
 
     def create_sales_channel(self):
         crm_team_obj = self.env['crm.team']
@@ -213,33 +212,29 @@ class woo_instance_ept(models.Model):
             'team_type': 'sales',
             'use_quotations': True
         }
-        sales_channel = crm_team_obj.create(vals)
-        return sales_channel
+        return crm_team_obj.create(vals)
 
     def create_woo_pricelist(self):
         pricelist_obj = self.env['product.pricelist']
         vals = {
-            'name': "Woo {} Pricelist".format(self.name),
-            'currency_id': self.currency_id and self.currency_id.id or False
+            'name': f"Woo {self.name} Pricelist",
+            'currency_id': self.currency_id and self.currency_id.id or False,
         }
-        pricelist = pricelist_obj.create(vals)
-        return pricelist
+        return pricelist_obj.create(vals)
 
     @api.multi
     def test_woo_connection(self):
         wcapi = self.connect_in_woo()
         r = wcapi.get("products")
         if not isinstance(r, requests.models.Response):
-            raise Warning(_("Response is not in proper format :: %s" % (r)))
+            raise Warning(_(f"Response is not in proper format :: {r}"))
         if r.status_code != 200:
             raise Warning(_("%s\n%s" % (r.status_code, r.reason)))
-        else:
-            self.env['woo.payment.gateway'].get_payment_gateway(self)
-            self.create_financial_status('paid')
-            self.create_financial_status('not_paid')
-            self._cr.commit()
-            raise Warning('Service working properly')
-        return True
+        self.env['woo.payment.gateway'].get_payment_gateway(self)
+        self.create_financial_status('paid')
+        self.create_financial_status('not_paid')
+        self._cr.commit()
+        raise Warning('Service working properly')
 
     def set_woo_current_currency_data(self):
         currency = self.get_woo_currency()
@@ -280,7 +275,7 @@ class woo_instance_ept(models.Model):
         wcapi = self.connect_in_woo()
         r = wcapi.get("products")
         if not isinstance(r,requests.models.Response):
-            raise Warning(_("Response is not in proper format :: %s"%(r)))
+            raise Warning(_(f"Response is not in proper format :: {r}"))
         if r.status_code != 200:
             raise Warning(_("%s\n%s"%(r.status_code,r.reason)))
         else:            
@@ -292,13 +287,19 @@ class woo_instance_ept(models.Model):
         host = self.host
         consumer_key = self.consumer_key
         consumer_secret = self.consumer_secret
-        wp_api = True if self.woo_version == 'new' else False
+        wp_api = self.woo_version == 'new'
         version = "wc/v1" if wp_api else "v3"
         if self.is_latest:
             version = "wc/v2"
-        wcapi = woocommerce.api.API(url=host, consumer_key=consumer_key,
-                    consumer_secret=consumer_secret,verify_ssl=self.verify_ssl,wp_api=wp_api,version=version,query_string_auth=True)
-        return wcapi
+        return woocommerce.api.API(
+            url=host,
+            consumer_key=consumer_key,
+            consumer_secret=consumer_secret,
+            verify_ssl=self.verify_ssl,
+            wp_api=wp_api,
+            version=version,
+            query_string_auth=True,
+        )
 
     @api.model
     def get_woo_currency(self):
@@ -337,16 +338,13 @@ class woo_instance_ept(models.Model):
                 currency.active = True
             if not currency:
                 raise Warning(
-                    "Currency {} not found in odoo.\nPlease make sure currency record is created for {} and is in active state.".format(
-                        currency_code, currency_code))
+                    f"Currency {currency_code} not found in odoo.\nPlease make sure currency record is created for {currency_code} and is in active state."
+                )
             return currency
 
     def sync_system_status(self, transaction_log_obj):
         wcapi = self.connect_in_woo()
-        if self.woo_version == 'new':
-            res = wcapi.get("system_status")
-        else:
-            res = wcapi.get("system_status")  # This api does not have system_status property.
+        res = wcapi.get("system_status")
         if not isinstance(res, requests.models.Response):
             transaction_log_obj.create(
                 {'message': "Import Woo System Status \nResponse is not in proper format :: %s" % (res),
@@ -356,7 +354,7 @@ class woo_instance_ept(models.Model):
                  })
             return {}
         if res.status_code not in [200, 201]:
-            message = "Error in Import Woo System Status %s" % (res.content)
+            message = f"Error in Import Woo System Status {res.content}"
             transaction_log_obj.create(
                 {'message': message,
                  'mismatch_details': True,
@@ -376,8 +374,7 @@ class woo_instance_ept(models.Model):
                                            })
             return []
         if self.woo_version == 'old':
-            errors = response.get('errors', '')
-            if errors:
+            if errors := response.get('errors', ''):
                 message = errors[0].get('message')
                 transaction_log_obj.create(
                     {'message': message,

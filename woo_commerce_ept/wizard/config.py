@@ -41,47 +41,43 @@ class woo_instance_config(models.TransientModel):
 
     @api.onchange('host')
     def onchange_host(self):
-        if self.host and 'https' in self.host:
-            self.verify_ssl = True
-        else:
-            self.verify_ssl = False
+        self.verify_ssl = bool(self.host and 'https' in self.host)
     
     @api.multi
     def test_woo_connection(self):
         host = self.host
         consumer_key = self.consumer_key
         consumer_secret = self.consumer_secret
-        wp_api = True if self.woo_version == 'new' else False
+        wp_api = self.woo_version == 'new'
         version = "wc/v1" if wp_api else "v3"
         if self.is_latest:
             version = "wc/v2"
         wcapi = woocommerce.api.API(url=host, consumer_key=consumer_key,
-                    consumer_secret=consumer_secret,verify_ssl=self.verify_ssl,wp_api=wp_api,version=version,query_string_auth=True)        
+                    consumer_secret=consumer_secret,verify_ssl=self.verify_ssl,wp_api=wp_api,version=version,query_string_auth=True)
         r = wcapi.get("products")
         if not isinstance(r,requests.models.Response):
-            raise Warning(_("Response is not in proper format :: %s"%(r)))
+            raise Warning(_(f"Response is not in proper format :: {r}"))
         if r.status_code != 200:
             raise Warning(_("%s\n%s"%(r.status_code,r.reason)))
-        else:
-            today = datetime.today()
-            last_date_order_import = today + timedelta(days=-3)
-            instance=self.env['woo.instance.ept'].create({'name':self.name,
-                                                 'consumer_key':self.consumer_key,                                                 
-                                                 'consumer_secret':self.consumer_secret,                                                 
-                                                 'host':self.host,
-                                                 'verify_ssl':self.verify_ssl,
-                                                 'country_id':self.country_id.id,
-                                                 'company_id':self.env.user.company_id.id,
-                                                 'is_image_url':self.is_image_url,
-                                                 'woo_version':self.woo_version,
-                                                 'is_latest':self.is_latest,
-                                                 'admin_username':self.admin_username,
-                                                 'admin_password':self.admin_password,
-                                                 'auto_active_currency': self.auto_active_currency,
-                                                 'last_synced_order_date':last_date_order_import,
-                                                 })        
-            if instance.is_latest:
-                self.env['woo.payment.gateway'].get_payment_gateway(instance)
+        today = datetime.now()
+        last_date_order_import = today + timedelta(days=-3)
+        instance=self.env['woo.instance.ept'].create({'name':self.name,
+                                             'consumer_key':self.consumer_key,                                                 
+                                             'consumer_secret':self.consumer_secret,                                                 
+                                             'host':self.host,
+                                             'verify_ssl':self.verify_ssl,
+                                             'country_id':self.country_id.id,
+                                             'company_id':self.env.user.company_id.id,
+                                             'is_image_url':self.is_image_url,
+                                             'woo_version':self.woo_version,
+                                             'is_latest':self.is_latest,
+                                             'admin_username':self.admin_username,
+                                             'admin_password':self.admin_password,
+                                             'auto_active_currency': self.auto_active_currency,
+                                             'last_synced_order_date':last_date_order_import,
+                                             })
+        if instance.is_latest:
+            self.env['woo.payment.gateway'].get_payment_gateway(instance)
         return {
             'type': 'ir.actions.client',
             'tag': 'reload',
@@ -94,8 +90,7 @@ class woo_config_settings(models.TransientModel):
     def create(self, vals):
         if not vals.get('company_id'):
             vals.update({'company_id': self.env.user.company_id.id})
-        res = super(woo_config_settings, self).create(vals)
-        return res
+        return super(woo_config_settings, self).create(vals)
     
     # @api.model
     # def _default_instance(self):
@@ -104,10 +99,10 @@ class woo_config_settings(models.TransientModel):
        
     @api.model
     def _get_woo_instance_default_company(self):
-        company_id = self.env.user._get_company()
-        if not company_id:
+        if company_id := self.env.user._get_company():
+            return company_id
+        else:
             raise Warning(_('There is no default company for the current user!'))
-        return company_id
         
     woo_instance_id = fields.Many2one('woo.instance.ept', 'Woo Instance',help="Select WooCommerce Instance that you want to configure.")
     woo_warehouse_id = fields.Many2one('stock.warehouse',string = "Woo Instance Warehouse",help="Stock Management, Order Processing & Fulfillment will be carried out from this warehouse.")
@@ -236,40 +231,64 @@ class woo_config_settings(models.TransientModel):
     @api.multi
     def execute(self):
         instance = self.woo_instance_id
-        values = {}
         res = super(woo_config_settings,self).execute()
         if instance:
-            values['company_id'] = self.woo_company_id and self.woo_company_id.id or False
-            values['warehouse_id'] = self.woo_warehouse_id and self.woo_warehouse_id.id or False
-            values['country_id'] = self.woo_country_id and self.woo_country_id.id or False
-            values['lang_id'] = self.woo_lang_id and self.woo_lang_id.id or False
-            values['use_custom_order_prefix'] = self.woo_use_custom_order_prefix or False
-            values['order_prefix'] = self.woo_order_prefix or ''
-            values['import_order_status_ids'] = [(6,0,self.woo_import_order_status_ids.ids)]
-            values['stock_field'] = self.woo_stock_field and self.woo_stock_field.id or False
-            values['pricelist_id'] = self.woo_pricelist_id and self.woo_pricelist_id.id or False
-            values['payment_term_id'] = self.woo_payment_term_id and self.woo_payment_term_id.id or False
-            values['fiscal_position_id'] = self.woo_fiscal_position_id and self.woo_fiscal_position_id.id or False
-            values['discount_product_id']=self.woo_discount_product_id.id or False
-            values['fee_line_id']=self.woo_fee_line_id.id or False
-            values['order_auto_import']=self.woo_order_auto_import
-            values['stock_auto_export']=self.woo_stock_auto_export
-            values['order_auto_update']=self.woo_order_auto_update
-            values['section_id']=self.woo_team_id and self.woo_team_id.id or False
-            values['auto_import_product']=self.woo_auto_import_product
-            values['is_set_price']=self.woo_is_set_price or False
-            values['is_set_stock']=self.woo_is_set_stock or False
-            values['is_publish']=self.woo_is_publish or False
-            values['is_set_image']=self.woo_is_set_image or False
-            values['sync_images_with_product']=self.woo_sync_images_with_product or False
-            values['sync_price_with_product']=self.woo_sync_price_with_product or False
-            values['is_show_debug_info']=self.woo_is_show_debug_info or False
-            values['global_channel_id']=self.woo_global_channel_id and self.woo_global_channel_id.id or False
-            #account Fields
-            values['woo_property_account_payable_id'] = self.woo_property_account_payable_id and self.woo_property_account_payable_id.id or False
-            values['woo_property_account_receivable_id'] = self.woo_property_account_receivable_id and self.woo_property_account_receivable_id.id or False
-            values['last_synced_order_date'] = self.last_synced_order_date
-            
+            values = {
+                'company_id': self.woo_company_id
+                and self.woo_company_id.id
+                or False,
+                'warehouse_id': self.woo_warehouse_id
+                and self.woo_warehouse_id.id
+                or False,
+                'country_id': self.woo_country_id
+                and self.woo_country_id.id
+                or False,
+                'lang_id': self.woo_lang_id and self.woo_lang_id.id or False,
+                'use_custom_order_prefix': self.woo_use_custom_order_prefix
+                or False,
+                'order_prefix': self.woo_order_prefix or '',
+                'import_order_status_ids': [
+                    (6, 0, self.woo_import_order_status_ids.ids)
+                ],
+                'stock_field': self.woo_stock_field
+                and self.woo_stock_field.id
+                or False,
+                'pricelist_id': self.woo_pricelist_id
+                and self.woo_pricelist_id.id
+                or False,
+                'payment_term_id': self.woo_payment_term_id
+                and self.woo_payment_term_id.id
+                or False,
+                'fiscal_position_id': self.woo_fiscal_position_id
+                and self.woo_fiscal_position_id.id
+                or False,
+                'discount_product_id': self.woo_discount_product_id.id or False,
+                'fee_line_id': self.woo_fee_line_id.id or False,
+                'order_auto_import': self.woo_order_auto_import,
+                'stock_auto_export': self.woo_stock_auto_export,
+                'order_auto_update': self.woo_order_auto_update,
+                'section_id': self.woo_team_id and self.woo_team_id.id or False,
+                'auto_import_product': self.woo_auto_import_product,
+                'is_set_price': self.woo_is_set_price or False,
+                'is_set_stock': self.woo_is_set_stock or False,
+                'is_publish': self.woo_is_publish or False,
+                'is_set_image': self.woo_is_set_image or False,
+                'sync_images_with_product': self.woo_sync_images_with_product
+                or False,
+                'sync_price_with_product': self.woo_sync_price_with_product
+                or False,
+                'is_show_debug_info': self.woo_is_show_debug_info or False,
+                'global_channel_id': self.woo_global_channel_id
+                and self.woo_global_channel_id.id
+                or False,
+                'woo_property_account_payable_id': self.woo_property_account_payable_id
+                and self.woo_property_account_payable_id.id
+                or False,
+                'woo_property_account_receivable_id': self.woo_property_account_receivable_id
+                and self.woo_property_account_receivable_id.id
+                or False,
+                'last_synced_order_date': self.last_synced_order_date,
+            }
             instance.write(values)
             self.setup_woo_order_import_cron(instance)
             self.setup_woo_order_status_update_cron(instance)
@@ -277,7 +296,7 @@ class woo_config_settings(models.TransientModel):
 
         return res
 
-    @api.multi   
+    @api.multi
     def setup_woo_order_import_cron(self,instance):
         if self.woo_order_auto_import:
             try:
@@ -293,9 +312,9 @@ class woo_config_settings(models.TransientModel):
                     'nextcall':nextcall.strftime('%Y-%m-%d %H:%M:%S'),
                     'code':"model.auto_import_woo_sale_order_ept(ctx={'woo_instance_id':%d})"%(instance.id),
                     'user_id': self.woo_order_import_user_id and self.woo_order_import_user_id.id}
-                    
+
             if cron_exist:
-                vals.update({'name' : cron_exist.name})
+                vals['name'] = cron_exist.name
                 cron_exist.write(vals)
             else:
                 try:
@@ -304,9 +323,9 @@ class woo_config_settings(models.TransientModel):
                     import_order_cron=False
                 if not import_order_cron:
                     raise Warning('Core settings of WooCommerce are deleted, please upgrade WooCommerce Connector module to back this settings.')
-                
-                name = instance.name + ' : ' +import_order_cron.name
-                vals.update({'name' : name})
+
+                name = f'{instance.name} : {import_order_cron.name}'
+                vals['name'] = name
                 new_cron = import_order_cron.copy(default=vals)
                 self.env['ir.model.data'].create({'module':'woo_commerce_ept',
                                                   'name':'ir_cron_import_woo_orders_instance_%d'%(instance.id),
@@ -319,12 +338,12 @@ class woo_config_settings(models.TransientModel):
                 cron_exist = self.env.ref('woo_commerce_ept.ir_cron_import_woo_orders_instance_%d'%(instance.id))
             except:
                 cron_exist=False
-            
+
             if cron_exist:
                 cron_exist.write({'active':False})
         return True        
     
-    @api.multi   
+    @api.multi
     def setup_woo_order_status_update_cron(self,instance):
         if self.woo_order_auto_update:
             try:
@@ -339,9 +358,9 @@ class woo_config_settings(models.TransientModel):
                     'nextcall':nextcall.strftime('%Y-%m-%d %H:%M:%S'),
                     'code':"model.auto_update_woo_order_status_ept(ctx={'woo_instance_id':%d})"%(instance.id),
                     'user_id': self.woo_order_update_user_id and self.woo_order_update_user_id.id}
-                    
+
             if cron_exist:
-                vals.update({'name' : cron_exist.name})
+                vals['name'] = cron_exist.name
                 cron_exist.write(vals)
             else:
                 try:
@@ -350,9 +369,9 @@ class woo_config_settings(models.TransientModel):
                     update_order_cron=False
                 if not update_order_cron:
                     raise Warning('Core settings of WooCommerce are deleted, please upgrade WooCommerce Connector module to back this settings.')
-                
-                name = instance.name + ' : ' +update_order_cron.name
-                vals.update({'name' : name}) 
+
+                name = f'{instance.name} : {update_order_cron.name}'
+                vals['name'] = name
                 new_cron = update_order_cron.copy(default=vals)
                 self.env['ir.model.data'].create({'module':'woo_commerce_ept',
                                                   'name':'ir_cron_update_woo_order_status_instance_%d'%(instance.id),
@@ -369,7 +388,7 @@ class woo_config_settings(models.TransientModel):
                 cron_exist.write({'active':False})
         return True
     
-    @api.multi   
+    @api.multi
     def setup_woo_update_stock_cron(self,instance):
         if self.woo_stock_auto_export:
             try:                
@@ -385,7 +404,7 @@ class woo_config_settings(models.TransientModel):
                     'code':"model.auto_update_stock_ept(ctx={'woo_instance_id':%d})"%(instance.id),
                     'user_id': self.woo_update_stock_interval_type and self.woo_update_stock_user_id.id}
             if cron_exist:
-                vals.update({'name' : cron_exist.name})
+                vals['name'] = cron_exist.name
                 cron_exist.write(vals)
             else:
                 try:                    
@@ -394,9 +413,9 @@ class woo_config_settings(models.TransientModel):
                     update_stock_cron=False
                 if not update_stock_cron:
                     raise Warning('Core settings of WooCommerce are deleted, please upgrade WooCommerce Connector module to back this settings.')
-                
-                name = instance.name + ' : ' +update_stock_cron.name
-                vals.update({'name':name})
+
+                name = f'{instance.name} : {update_stock_cron.name}'
+                vals['name'] = name
                 new_cron = update_stock_cron.copy(default=vals)
                 self.env['ir.model.data'].create({'module':'woo_commerce_ept',
                                                   'name':'ir_cron_update_woo_stock_instance_%d'%(instance.id),
@@ -410,5 +429,5 @@ class woo_config_settings(models.TransientModel):
             except:
                 cron_exist=False
             if cron_exist:
-                cron_exist.write({'active':False})        
+                cron_exist.write({'active':False})
         return True

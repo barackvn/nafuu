@@ -71,19 +71,18 @@ class XmlrpcMethod(object):
             if self.optional_args:
                 max_num_args = len(self.method_args) + len(self.optional_args)
                 if not (len(self.method_args) <= len(args) <= max_num_args):
-                    raise ValueError("Invalid number of parameters to %s" % self.method_name)
-            else:
-                if len(args) != len(self.method_args):
-                    raise ValueError("Invalid number of parameters to %s" % self.method_name)
+                    raise ValueError(f"Invalid number of parameters to {self.method_name}")
+            elif len(args) != len(self.method_args):
+                raise ValueError(f"Invalid number of parameters to {self.method_name}")
 
             for i, arg_name in enumerate(self.method_args):
                 setattr(self, arg_name, args[i])
 
-            if self.optional_args:
-                for i, arg_name in enumerate(self.optional_args, start=len(self.method_args)):
-                    if i >= len(args):
-                        break
-                    setattr(self, arg_name, args[i])
+        if self.optional_args:
+            for i, arg_name in enumerate(self.optional_args, start=len(self.method_args)):
+                if i >= len(args):
+                    break
+                setattr(self, arg_name, args[i])
 
         if 'results_class' in kwargs:
             self.results_class = kwargs['results_class']
@@ -102,21 +101,19 @@ class XmlrpcMethod(object):
         """
         default_args = self.default_args(client)
 
-        if self.method_args or self.optional_args:
-            optional_args = getattr(self, 'optional_args', tuple())
-            args = []
-            for arg in (self.method_args + optional_args):
-                if hasattr(self, arg):
-                    obj = getattr(self, arg)
-                    if hasattr(obj, 'struct'):
-                        args.append(obj.struct)
-                    else:
-                        args.append(obj)
-            args = list(default_args) + args
-        else:
-            args = default_args
+        if not self.method_args and not self.optional_args:
+            return default_args
 
-        return args
+        optional_args = getattr(self, 'optional_args', tuple())
+        args = []
+        for arg in (self.method_args + optional_args):
+            if hasattr(self, arg):
+                obj = getattr(self, arg)
+                if hasattr(obj, 'struct'):
+                    args.append(obj.struct)
+                else:
+                    args.append(obj)
+        return list(default_args) + args
 
     def process_result(self, raw_result):
         """

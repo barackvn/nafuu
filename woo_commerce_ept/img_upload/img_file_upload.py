@@ -14,8 +14,13 @@ class SpecialTransport(compat.xmlrpc_client.Transport):
 
 def upload_image(instance,image_data,image_name):
     if not image_data or not image_name:
-        return {}    
-    client = base.Client('%s/xmlrpc.php'%(instance.host), instance.admin_username,instance.admin_password,transport=SpecialTransport())
+        return {}
+    client = base.Client(
+        f'{instance.host}/xmlrpc.php',
+        instance.admin_username,
+        instance.admin_password,
+        transport=SpecialTransport(),
+    )
     data = base64.decodestring(image_data)
     # create a temporary file, and save the image
     fobj = tempfile.NamedTemporaryFile(delete=False)
@@ -25,17 +30,15 @@ def upload_image(instance,image_data,image_name):
     mimetype=magic.from_file(filename, mime=True)
     # prepare metadata
     data = {
-    'name': '%s_%s.%s'%(image_name,instance.id,mimetype.split(b"/")[1].decode('utf-8')),
-    'type': mimetype, # mimetype
+        'name': f"""{image_name}_{instance.id}.{mimetype.split(b"/")[1].decode('utf-8')}""",
+        'type': mimetype,
     }
-    
+
     # read the binary file and let the XMLRPC library encode it into base64
     with open(filename, 'rb') as img:
         data['bits'] = compat.xmlrpc_client.Binary(img.read())
-    
-    res = client.call(media.UploadFile(data))
-    
-    return res
+
+    return client.call(media.UploadFile(data))
 
 def fetch_image(image_url):
     if not image_url:

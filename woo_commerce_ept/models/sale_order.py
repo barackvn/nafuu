@@ -18,17 +18,10 @@ class sale_order(models.Model):
     @api.one
     def _get_woo_order_status(self):
         for order in self:
-            flag=False
-            for picking in order.picking_ids:
-                if picking.state!='cancel':
-                    flag=True
-                    break   
+            flag = any(picking.state!='cancel' for picking in order.picking_ids)
             if not flag:
                 continue
-            if order.picking_ids:
-                order.updated_in_woo=True
-            else:
-                order.updated_in_woo=False
+            order.updated_in_woo = bool(order.picking_ids)
             for picking in order.picking_ids:
                 if picking.state =='cancel':
                     continue
@@ -47,19 +40,14 @@ class sale_order(models.Model):
                 """
         self._cr.execute(query)
         results = self._cr.fetchall()
-        order_ids=[]
-        for result_tuple in results:
-            order_ids.append(result_tuple[0])
+        order_ids = [result_tuple[0] for result_tuple in results]
         order_ids = list(set(order_ids))
         return [('id','in',order_ids)]
 
     @api.multi
     def visibl_transaction_id(self):
         for order in self:
-            if order.woo_instance_id.woo_version == "new":
-                order.visible_trans_id=True
-            else:
-                order.visible_trans_id=False    
+            order.visible_trans_id = order.woo_instance_id.woo_version == "new"    
     
     woo_order_id=fields.Char("Woo Order Reference",help="WooCommerce Order Reference")
     woo_order_number=fields.Char("Order Number",help="WooCommerce Order Number")
@@ -76,45 +64,58 @@ class sale_order(models.Model):
         country_obj=self.env['res.country']
         state_obj=self.env['res.country.state']
         partner_obj=self.env['res.partner']
-        
+
         first_name=vals.get('first_name')
         last_name=vals.get('last_name')
-        
+
         if not first_name and not last_name:
             return False
-        
+
         city=vals.get('city')
-        
-        name = "%s %s"%(first_name,last_name)
-        
-        
+
+        name = f"{first_name} {last_name}"
+            
+
         company_name=vals.get("company")
-        
+
         if company_name and not parent_id:
             is_company=True
-        
-        email=vals.get('email')                      
-        phone=vals.get("phone")                                  
+
+        email=vals.get('email')
+        phone=vals.get("phone")
         zip=vals.get('postcode')            
-        
-        
+
+
         address1=vals.get('address_1')
         address2=vals.get('address_2')
         country_name=vals.get('country')
         state_name = vals.get('state')
-        
+
         woo_customer_id = woo_cust_id
-        woo_customer_id = "%s_%s"%(instance.id,woo_customer_id) if woo_customer_id else False 
-                             
+        woo_customer_id = (
+            f"{instance.id}_{woo_customer_id}" if woo_customer_id else False
+        ) 
+
         country=country_obj.search([('code','=',country_name)],limit=1)
         if not country:
             country=country_obj.search([('name','=',country_name)],limit=1)
-            
-        if not country:
-            state=state_obj.search(["|", ('code', '=', state_name),('name','=',state_name)],limit=1)            
-        else:
-            state = state_obj.search(["|", ('code', '=', state_name), ('name', '=', state_name), ('country_id', '=', country.id)],limit=1)           
-                        
+
+        state = (
+            state_obj.search(
+                [
+                    "|",
+                    ('code', '=', state_name),
+                    ('name', '=', state_name),
+                    ('country_id', '=', country.id),
+                ],
+                limit=1,
+            )
+            if country
+            else state_obj.search(
+                ["|", ('code', '=', state_name), ('name', '=', state_name)],
+                limit=1,
+            )
+        )
 #         vals={'woo_customer_id':woo_customer_id}
 #         keys=['woo_customer_id']
 #         partner = partner_obj._find_partner(vals, key_list=keys)
@@ -126,14 +127,27 @@ class sale_order(models.Model):
 #             partner = partner_obj._find_partner(vals, key_list=keys)
 
         if partner:
-            partner_vals={'state_id':state and state.id or False,'is_company':is_company,'woo_company_name_ept':company_name or partner.woo_company_name_ept,
-                           'phone':phone or partner.phone,'woo_customer_id':woo_customer_id or partner.woo_customer_id,
-                           'lang':instance.lang_id.code,'name':partner.name,
-                           'property_product_pricelist':instance.pricelist_id.id,
-                           'property_account_position_id':instance.fiscal_position_id and instance.fiscal_position_id.id or False,
-                           'property_payment_term_id':instance.payment_term_id and instance.payment_term_id.id or False,'email':email or False}
-            partner_vals.update({'property_account_payable_id':instance.woo_property_account_payable_id.id,'property_account_receivable_id':instance.woo_property_account_receivable_id.id})
-            
+            partner_vals = {
+                'state_id': state and state.id or False,
+                'is_company': is_company,
+                'woo_company_name_ept': company_name
+                or partner.woo_company_name_ept,
+                'phone': phone or partner.phone,
+                'woo_customer_id': woo_customer_id or partner.woo_customer_id,
+                'lang': instance.lang_id.code,
+                'name': partner.name,
+                'property_product_pricelist': instance.pricelist_id.id,
+                'property_account_position_id': instance.fiscal_position_id
+                and instance.fiscal_position_id.id
+                or False,
+                'property_payment_term_id': instance.payment_term_id
+                and instance.payment_term_id.id
+                or False,
+                'email': email or False,
+            } | {
+                'property_account_payable_id': instance.woo_property_account_payable_id.id,
+                'property_account_receivable_id': instance.woo_property_account_receivable_id.id,
+            }
 #             woo_partner_vals = partner_obj._prepare_partner_vals(partner_vals)
 #             woo_partner_vals.update({
 #                 'woo_company_name_ept': company_name or partner.woo_company_name_ept,
@@ -141,36 +155,57 @@ class sale_order(models.Model):
 #             })
             partner.write(partner_vals)
         else:
-            partner_vals={'type':type,'parent_id':parent_id,'woo_customer_id':woo_customer_id or '',
-                                        'name':name,'state_id':state and state.id or False,'city':city,
-                                        'street':address1,'street2':address2,
-                                        'phone':phone,'zip':zip,'email':email,
-                                        'country_id':country and country.id or False,'is_company':is_company,
-                                        'lang':instance.lang_id.code,
-                                        'property_product_pricelist':instance.pricelist_id.id,
-                                        'property_account_position_id':instance.fiscal_position_id and instance.fiscal_position_id.id or False,
-                                        'property_payment_term_id':instance.payment_term_id and instance.payment_term_id.id or False,
-                                        'woo_company_name_ept':company_name}
-            partner_vals.update({'property_account_payable_id':instance.woo_property_account_payable_id.id,'property_account_receivable_id':instance.woo_property_account_receivable_id.id})
+            partner_vals = {
+                'type': type,
+                'parent_id': parent_id,
+                'woo_customer_id': woo_customer_id or '',
+                'name': name,
+                'state_id': state and state.id or False,
+                'city': city,
+                'street': address1,
+                'street2': address2,
+                'phone': phone,
+                'zip': zip,
+                'email': email,
+                'country_id': country and country.id or False,
+                'is_company': is_company,
+                'lang': instance.lang_id.code,
+                'property_product_pricelist': instance.pricelist_id.id,
+                'property_account_position_id': instance.fiscal_position_id
+                and instance.fiscal_position_id.id
+                or False,
+                'property_payment_term_id': instance.payment_term_id
+                and instance.payment_term_id.id
+                or False,
+                'woo_company_name_ept': company_name,
+            } | {
+                'property_account_payable_id': instance.woo_property_account_payable_id.id,
+                'property_account_receivable_id': instance.woo_property_account_receivable_id.id,
+            }
             partner=partner_obj.create(partner_vals)
         return partner
    
     @api.model
     def createWooAccountTax(self,value,price_included,company,title):
         accounttax_obj = self.env['account.tax']
-        
-        if price_included:
-            name='%s_(%s %s included %s)_%s'%(title,str(value),'%',price_included and 'T' or 'F',company.name)
-        else:
-            name='%s_(%s %s excluded %s)_%s'%(title,str(value),'%',price_included and 'F' or 'T',company.name)            
 
-        accounttax_id = accounttax_obj.create({'name':name,'amount':float(value),'type_tax_use':'sale','price_include':price_included,'company_id':company.id})
-        
-        return accounttax_id
+        if price_included:
+            name = f"{title}_({str(value)} % included {price_included and 'T' or 'F'})_{company.name}"
+        else:
+            name = f"{title}_({str(value)} % excluded {price_included and 'F' or 'T'})_{company.name}"            
+
+        return accounttax_obj.create(
+            {
+                'name': name,
+                'amount': float(value),
+                'type_tax_use': 'sale',
+                'price_include': price_included,
+                'company_id': company.id,
+            }
+        )
 
     @api.model
     def get_woo_tax_id_ept(self,instance,tax_datas,tax_included):
-        tax_id=[]        
         taxes=[]
         for tax in tax_datas:
             rate=float(tax.get('rate',0.0))
@@ -192,10 +227,7 @@ class sale_order(models.Model):
                                                     })                    
                 if acctax_id:
                     taxes.append(acctax_id.id)
-        if taxes:
-            tax_id = [(6, 0, taxes)]
-
-        return tax_id
+        return [(6, 0, taxes)] if taxes else []
     
     @api.model
     def check_woo_mismatch_details(self,lines,instance,order_number):
@@ -212,14 +244,14 @@ class sale_order(models.Model):
                 line_product_id=line.get('product_id',False) or line.get('variation_id',False)
                 line_product_sku = line.get('sku', False)
                 if not line_product_sku:
-                    transaction_log_obj.create({
-                        'message': "Order %s not imported because Sku not found in Product : %s of ID : %s ." % (
-                            order_number, line.get('name', False),
-                            line.get('product_id', False)),
-                        'mismatch_details': True,
-                        'type': 'sales',
-                        'woo_instance_id': instance.id
-                    })
+                    transaction_log_obj.create(
+                        {
+                            'message': f"Order {order_number} not imported because Sku not found in Product : {line.get('name', False)} of ID : {line.get('product_id', False)} .",
+                            'mismatch_details': True,
+                            'type': 'sales',
+                            'woo_instance_id': instance.id,
+                        }
+                    )
                     mismatch = True
                     break
 
@@ -227,13 +259,13 @@ class sale_order(models.Model):
             odoo_product=False
             woo_variant=False
             if line_product_id:
-                woo_variant=woo_product_obj.search([('variant_id','=',line_product_id),('woo_instance_id','=',instance.id)],limit=1)                
+                woo_variant=woo_product_obj.search([('variant_id','=',line_product_id),('woo_instance_id','=',instance.id)],limit=1)
                 if woo_variant:
                     continue
                 try:
                     if line_product_id:
                         wcapi = instance.connect_in_woo()
-                        res=wcapi.get('products/%s'%line_product_id)
+                        res = wcapi.get(f'products/{line_product_id}')
                         if not isinstance(res,requests.models.Response):               
                             transaction_log_obj.create({'message': "Get Product \nResponse is not in proper format :: %s"%(res),
                                                          'mismatch_details':True,
@@ -241,7 +273,7 @@ class sale_order(models.Model):
                                                          'woo_instance_id':instance.id
                                                         })
                             mismatch=True
-                            break    
+                            break
                         try:                    
                             woo_variant = res.json()
                         except Exception as e:
@@ -250,22 +282,23 @@ class sale_order(models.Model):
                                          'type':'sales',
                                          'woo_instance_id':instance.id
                                         })
-                            continue                        
-                        if instance.woo_version == 'old':
-                            errors = woo_variant.get('errors','')
-                            if errors:
+                            continue
+                        if errors := woo_variant.get('errors', ''):
+                            if instance.woo_version == 'old':
                                 message = errors[0].get('message')
                                 transaction_log_obj.create(
-                                                            {'message':"Product Removed from WooCommerce site,  %s"%(message),
-                                                             'mismatch_details':True,
-                                                             'type':'product',
-                                                             'woo_instance_id':instance.id
-                                                            })
+                                    {
+                                        'message': f"Product Removed from WooCommerce site,  {message}",
+                                        'mismatch_details': True,
+                                        'type': 'product',
+                                        'woo_instance_id': instance.id,
+                                    }
+                                )
                     else:
                         woo_variant = False
                 except:
                     woo_variant=False
-                    message="Variant Id %s not found in woo || default_code %s || order ref %s"%(line_product_id,line.get('sku'),order_number)
+                    message = f"Variant Id {line_product_id} not found in woo || default_code {line.get('sku')} || order ref {order_number}"
                     log=transaction_log_obj.search([('woo_instance_id','=',instance.id),('message','=',message)])
                     if not log:
                         transaction_log_obj.create(
@@ -290,7 +323,7 @@ class sale_order(models.Model):
                 woo_variant=sku and woo_product_obj.search([('default_code','=',sku),('woo_instance_id','=',instance.id)],limit=1)
                 if not woo_variant:
                     odoo_product=sku and odoo_product_obj.search([('default_code','=',sku)],limit=1)
-            
+
             if not odoo_product:
                 if instance.woo_version=="new" and line_product_id: 
                         woo_product_template_obj.sync_new_products(instance,line_product_id)
@@ -298,9 +331,9 @@ class sale_order(models.Model):
                 if instance.woo_version=="old" and line_product_id: 
                         woo_product_template_obj.sync_products(instance,line_product_id)
                         odoo_product = odoo_product_obj.search([('default_code','=',sku)],limit=1)
-                
+
             if not woo_variant and not odoo_product:
-                message="%s Product Code Not found for order %s"%(sku,order_number)
+                message = f"{sku} Product Code Not found for order {order_number}"
                 log=transaction_log_obj.search([('woo_instance_id','=',instance.id),('message','=',message)])
                 if not log:
                     transaction_log_obj.create(
@@ -352,7 +385,7 @@ class sale_order(models.Model):
     def create_or_update_woo_product(self,line,instance,wcapi):
         transaction_log_obj=self.env["woo.transaction.log"]
         woo_product_tmpl_obj=self.env['woo.product.template.ept']
-        woo_product_obj=self.env['woo.product.product.ept']        
+        woo_product_obj=self.env['woo.product.product.ept']
         variant_id=False
         if instance.woo_version == 'old':
             variant_id=line.get('product_id')
@@ -367,14 +400,14 @@ class sale_order(models.Model):
             woo_product and woo_product.write({'variant_id':variant_id})
             if woo_product:
                 return woo_product
-            response=wcapi.get('products/%s'%(variant_id))
+            response = wcapi.get(f'products/{variant_id}')
             if not isinstance(response,requests.models.Response):               
                 transaction_log_obj.create({'message': "Get Product \nResponse is not in proper format :: %s"%(response),
                                              'mismatch_details':True,
                                              'type':'sales',
                                              'woo_instance_id':instance.id
                                             })
-                return False           
+                return False
             try:
                 res = response.json()
             except Exception as e:
@@ -384,7 +417,7 @@ class sale_order(models.Model):
                              'woo_instance_id':instance.id
                             })
                 return False
-            
+
             parent_id = False
             if instance.woo_version == 'old':
                 result = res.get('product')
@@ -396,7 +429,7 @@ class sale_order(models.Model):
                 parent_id = res.get('parent_id',False)
                 if not parent_id:
                     parent_id = variant_id
-                woo_product_tmpl_obj.sync_new_products(instance,parent_id,update_templates=True)                        
+                woo_product_tmpl_obj.sync_new_products(instance,parent_id,update_templates=True)
             woo_product=woo_product_obj.search([('woo_instance_id','=',instance.id),('variant_id','=',variant_id)],limit=1)
         else:
             woo_product=woo_product_obj.search([('woo_instance_id','=',instance.id),('default_code','=',line.get('sku'))],limit=1)
@@ -434,82 +467,84 @@ class sale_order(models.Model):
 
     @api.model
     def get_woo_order_vals(self,result,workflow,invoice_address,instance,partner,shipping_address,pricelist_id,fiscal_position,payment_term,payment_gateway):
-            woo_order_number = ''
-            note = ''
-            created_at = False
-            if instance.woo_version == 'old':
-                woo_order_number = result.get('order_number')
-                note = result.get('note')
-                created_at = result.get('created_at')
-                woo_trans_id = ""
-                woo_customer_ip = result.get("customer_ip")
-            elif instance.woo_version == 'new':
-                woo_order_number = result.get('number')
-                note = result.get('customer_note')
-                created_at = result.get('date_created')     
-                woo_trans_id = result.get("transaction_id")
-                woo_customer_ip = result.get("customer_ip_address")
+        woo_order_number = ''
+        note = ''
+        created_at = False
+        if instance.woo_version == 'old':
+            woo_order_number = result.get('order_number')
+            note = result.get('note')
+            created_at = result.get('created_at')
+            woo_trans_id = ""
+            woo_customer_ip = result.get("customer_ip")
+        elif instance.woo_version == 'new':
+            woo_order_number = result.get('number')
+            note = result.get('customer_note')
+            created_at = result.get('date_created')     
+            woo_trans_id = result.get("transaction_id")
+            woo_customer_ip = result.get("customer_ip_address")
 
             # Edited by jigneshb
-            if instance.order_prefix:
-                name="%s%s"%(instance.order_prefix,woo_order_number)
-            elif not instance.use_custom_order_prefix:
-                name=self.env['ir.sequence'].next_by_code('sale.order') or _('New')
-            else:
-                name=woo_order_number
-                
-            ordervals = {               
-                'partner_invoice_id' : invoice_address.ids[0],
-                'date_order' :created_at,
-                'warehouse_id' : instance.warehouse_id.id,
-                'partner_id' : partner.ids[0],
-                'partner_shipping_id' : shipping_address.ids[0],
-                'state' : 'draft',
-                'pricelist_id' : pricelist_id or instance.pricelist_id.id or False,
-                'fiscal_position_id': fiscal_position and fiscal_position.id or False,
-                'payment_term_id':payment_term or instance.payment_term_id.id or False, 
-                }
+        if instance.order_prefix:
+            name = f"{instance.order_prefix}{woo_order_number}"
+        elif not instance.use_custom_order_prefix:
+            name=self.env['ir.sequence'].next_by_code('sale.order') or _('New')
+        else:
+            name=woo_order_number
 
-            woo_order_vals = self.create_sales_order_vals_ept(ordervals)
+        ordervals = {               
+            'partner_invoice_id' : invoice_address.ids[0],
+            'date_order' :created_at,
+            'warehouse_id' : instance.warehouse_id.id,
+            'partner_id' : partner.ids[0],
+            'partner_shipping_id' : shipping_address.ids[0],
+            'state' : 'draft',
+            'pricelist_id' : pricelist_id or instance.pricelist_id.id or False,
+            'fiscal_position_id': fiscal_position and fiscal_position.id or False,
+            'payment_term_id':payment_term or instance.payment_term_id.id or False, 
+            }
 
-            if workflow:
-                if not workflow.picking_policy:
-                    raise Warning("Please configure Sale Auto Workflow properly.")
-                woo_order_vals.update({
-                    'picking_policy' : workflow.picking_policy,
-                    'auto_workflow_process_id':workflow.id,
-                    'invoice_policy':workflow.invoice_policy
-                    })
+        woo_order_vals = self.create_sales_order_vals_ept(ordervals)
 
-            # Edited by jigneshb because prefix is not working when use common connector library.
+        if workflow:
+            if not workflow.picking_policy:
+                raise Warning("Please configure Sale Auto Workflow properly.")
             woo_order_vals.update({
-                'name': name,
-                'note': note,
-                'woo_order_id': result.get('id'),
-                'woo_order_number': woo_order_number,
-                'woo_instance_id': instance.id,
-                'team_id': instance.section_id and instance.section_id.id or False,
-                'company_id': instance.company_id.id,
-                'payment_gateway_id': payment_gateway and payment_gateway.id or False,
-                'woo_trans_id': woo_trans_id,
-                'woo_customer_ip': woo_customer_ip,
-                'global_channel_id': instance.global_channel_id and instance.global_channel_id.id or False,
+                'picking_policy' : workflow.picking_policy,
+                'auto_workflow_process_id':workflow.id,
+                'invoice_policy':workflow.invoice_policy
+                })
 
-            })
+        # Edited by jigneshb because prefix is not working when use common connector library.
+        woo_order_vals.update({
+            'name': name,
+            'note': note,
+            'woo_order_id': result.get('id'),
+            'woo_order_number': woo_order_number,
+            'woo_instance_id': instance.id,
+            'team_id': instance.section_id and instance.section_id.id or False,
+            'company_id': instance.company_id.id,
+            'payment_gateway_id': payment_gateway and payment_gateway.id or False,
+            'woo_trans_id': woo_trans_id,
+            'woo_customer_ip': woo_customer_ip,
+            'global_channel_id': instance.global_channel_id and instance.global_channel_id.id or False,
 
-            return woo_order_vals
+        })
+
+        return woo_order_vals
 
     def import_all_woo_orders(self,wcapi,instance,transaction_log_obj,order_status,page,after_date=False,before_date=False,is_cron=False):
-        if instance.woo_version == 'new':
-            if after_date and before_date:
-                res = wcapi.get('orders?status=%s&per_page=100&page=%s&after=%s&before=%s'%(order_status.status,page,after_date,before_date))
-            else:
-                res = wcapi.get('orders?status=%s&per_page=100&page=%s'%(order_status.status,page))    
+        if after_date and before_date:
+            res = wcapi.get(
+                f'orders?status={order_status.status}&per_page=100&page={page}&after={after_date}&before={before_date}'
+            )
+        elif instance.woo_version == 'new':
+            res = wcapi.get(
+                f'orders?status={order_status.status}&per_page=100&page={page}'
+            )
         else:
-            if after_date and before_date:
-                res = wcapi.get('orders?status=%s&per_page=100&page=%s&after=%s&before=%s'%(order_status.status,page,after_date,before_date))
-            else:
-                res = wcapi.get('orders?status=%s&filter[limit]=1000&page=%s'%(order_status.status,page))
+            res = wcapi.get(
+                f'orders?status={order_status.status}&filter[limit]=1000&page={page}'
+            )
         if not isinstance(res,requests.models.Response):               
             transaction_log_obj.create({'message': "Import All Orders \nResponse is not in proper format :: %s"%(res),
                                          'mismatch_details':True,
@@ -518,7 +553,7 @@ class sale_order(models.Model):
                                         })
             return []
         if res.status_code not in [200,201]:
-            message = "Error in Import All Orders %s"%(res.content)                        
+            message = f"Error in Import All Orders {res.content}"
             transaction_log_obj.create(
                                 {'message':message,
                                  'mismatch_details':True,
@@ -537,8 +572,7 @@ class sale_order(models.Model):
                                 })
             return []
         if instance.woo_version == 'old':
-            errors = response.get('errors','')
-            if errors:
+            if errors := response.get('errors', ''):
                 message = errors[0].get('message')
                 transaction_log_obj.create(
                                             {'message':message,
@@ -554,19 +588,20 @@ class sale_order(models.Model):
     @api.model
     def auto_import_woo_sale_order_ept(self,ctx={}):
         woo_instance_obj=self.env['woo.instance.ept']
-        if not isinstance(ctx,dict) or not 'woo_instance_id' in ctx:
+        if not isinstance(ctx, dict) or 'woo_instance_id' not in ctx:
             return True
-        woo_instance_id = ctx.get('woo_instance_id',False)
-        if woo_instance_id:
-            instance=woo_instance_obj.search([('id','=',woo_instance_id),('state','=','confirmed')])
-            if instance and instance.woo_version == 'old':
-                after_date = instance.last_synced_order_date
-                before_date = str(datetime.now())
-                self.import_woo_orders(instance,before_date,after_date,is_cron=True)
-            elif instance and instance.woo_version == 'new':
-                after_date = instance.last_synced_order_date
-                before_date = str(datetime.now())
-                self.import_new_woo_orders(instance,before_date,after_date,is_cron=True)
+        if woo_instance_id := ctx.get('woo_instance_id', False):
+            if instance := woo_instance_obj.search(
+                [('id', '=', woo_instance_id), ('state', '=', 'confirmed')]
+            ):
+                if instance.woo_version == 'old':
+                    after_date = instance.last_synced_order_date
+                    before_date = str(datetime.now())
+                    self.import_woo_orders(instance,before_date,after_date,is_cron=True)
+                elif instance.woo_version == 'new':
+                    after_date = instance.last_synced_order_date
+                    before_date = str(datetime.now())
+                    self.import_new_woo_orders(instance,before_date,after_date,is_cron=True)
         return True
 
     @api.model
@@ -574,22 +609,19 @@ class sale_order(models.Model):
         payment_method = ""
         total = 0
         discount = 0
-        
+
         if instance.woo_version == 'old':
             payment_method = order.get("payment_details").get("method_id")
             total = order.get("total")
             discount = order.get("total_discount")
-        
+
         if instance.woo_version == 'new':
             payment_method = order.get("payment_method")
             total = order.get("total")
             if order.get("coupon_lines"):
                 discount = order.get("coupon_lines")[0].get("discount")
-                
-        if not payment_method and float(total) == 0 or float(discount) > 0:
-            return True
-        else:
-            return False 
+
+        return not payment_method and float(total) == 0 or float(discount) > 0 
 
     @api.model
     def import_woo_orders(self,instance=False,before_date=False,after_date=False,is_cron=False):

@@ -77,7 +77,9 @@ class woo_product_categ_ept(models.Model):
     def _compute_complete_name(self):
         for category in self:
             if category.parent_id:
-                category.complete_name = '%s / %s' % (category.parent_id.complete_name, category.name)
+                category.complete_name = (
+                    f'{category.parent_id.complete_name} / {category.name}'
+                )
             else:
                 category.complete_name = category.name
     
@@ -88,17 +90,17 @@ class woo_product_categ_ept(models.Model):
     @api.multi
     def export_product_categs(self,instance,woo_product_categs):
         transaction_log_obj=self.env['woo.transaction.log']
-        wcapi = instance.connect_in_woo()        
+        wcapi = instance.connect_in_woo()
         for woo_product_categ in woo_product_categs:
             if woo_product_categ.woo_categ_id:
-                res = wcapi.get("products/categories/%s"%(woo_product_categ.woo_categ_id))
+                res = wcapi.get(f"products/categories/{woo_product_categ.woo_categ_id}")
                 if not isinstance(res,requests.models.Response):
                     transaction_log_obj.create({'message':"Get Product Category \nResponse is not in proper format :: %s"%(res),
                                                  'mismatch_details':True,
                                                  'type':'category',
                                                  'woo_instance_id':instance.id
                                                 })
-                    continue                                    
+                    continue
                 if res.status_code != 404:
                     continue
                 if res.status_code not in [200,201]:
@@ -109,14 +111,13 @@ class woo_product_categ_ept(models.Model):
                                          'woo_instance_id':instance.id
                                         })
                     continue
-            product_categs=[]
-            product_categs.append(woo_product_categ)
+            product_categs = [woo_product_categ]
             for categ in product_categs:
                 if categ.parent_id and categ.parent_id not in product_categs and not categ.parent_id.woo_categ_id:
                     product_categs.append(categ.parent_id)
-                    
+
             product_categs.reverse()
-            for woo_product_categ in product_categs:                
+            for woo_product_categ in product_categs:        
                 img_url = ''
                 if instance.is_image_url:
                     if woo_product_categ.response_url:
@@ -131,24 +132,28 @@ class woo_product_categ_ept(models.Model):
                     elif woo_product_categ.url:
                         img_url = woo_product_categ.url
                 else:
-                    res = {}            
+                    res = {}
                     if woo_product_categ.image:
-                        res = img_file_upload.upload_image(instance,woo_product_categ.image,"%s_%s"%(woo_product_categ.name,woo_product_categ.id))
+                        res = img_file_upload.upload_image(
+                            instance,
+                            woo_product_categ.image,
+                            f"{woo_product_categ.name}_{woo_product_categ.id}",
+                        )
                     img_url = res and res.get('url',False) or ''
                 row_data = {'name': str(woo_product_categ.name),
                                            'description':str(woo_product_categ.description or ''),                                           
                                            'display':str(woo_product_categ.display),
                                            }
                 if woo_product_categ.slug:
-                    row_data.update({'slug':str(woo_product_categ.slug)})
+                    row_data['slug'] = str(woo_product_categ.slug)
                 img_url and row_data.update({'image' :img_url})
                 if instance.woo_version == 'new' and img_url:
-                    row_data.update({'image' :{'src':img_url}})
-                woo_product_categ.parent_id.woo_categ_id and row_data.update({'parent':woo_product_categ.parent_id.woo_categ_id})   
-                if instance.woo_version == 'old':                
-                    data = {'product_category':row_data}                    
-                elif instance.woo_version == 'new':
+                    row_data['image'] = {'src':img_url}
+                woo_product_categ.parent_id.woo_categ_id and row_data.update({'parent':woo_product_categ.parent_id.woo_categ_id})
+                if instance.woo_version == 'new':
                     data = row_data
+                elif instance.woo_version == 'old':
+                    data = {'product_category':row_data}
                 res=wcapi.post("products/categories", data)
                 if not isinstance(res,requests.models.Response):
                     transaction_log_obj.create({'message':"Export Product Category \nResponse is not in proper format :: %s"%(res),
@@ -157,29 +162,27 @@ class woo_product_categ_ept(models.Model):
                                                  'woo_instance_id':instance.id
                                                 })
                     continue
-                if res.status_code not in [200,201]:
-                    if res.status_code == 500:
-                        try:
-                            response = res.json()
-                        except Exception as e:
-                            transaction_log_obj.create({'message':"Json Error : While export product category %s to WooCommerce for instance %s. \n%s"%(woo_product_categ.name,instance.name,e),
-                                 'mismatch_details':True,
-                                 'type':'category',
-                                 'woo_instance_id':instance.id
-                                })
-                            continue
-                        if isinstance(response,dict) and response.get('code')=='term_exists':
-                            woo_product_categ.write({'woo_categ_id':response.get('data'),'exported_in_woo':True})
-                            continue
-                        else:                                            
-                            message = res.content           
-                            transaction_log_obj.create(
-                                                        {'message':message,
-                                                         'mismatch_details':True,
-                                                         'type':'category',
-                                                         'woo_instance_id':instance.id
-                                                        })
-                            continue
+                if res.status_code not in [200, 201] and res.status_code == 500:
+                    try:
+                        response = res.json()
+                    except Exception as e:
+                        transaction_log_obj.create({'message':"Json Error : While export product category %s to WooCommerce for instance %s. \n%s"%(woo_product_categ.name,instance.name,e),
+                             'mismatch_details':True,
+                             'type':'category',
+                             'woo_instance_id':instance.id
+                            })
+                        continue
+                    if isinstance(response,dict) and response.get('code')=='term_exists':
+                        woo_product_categ.write({'woo_categ_id':response.get('data'),'exported_in_woo':True})
+                    else:                            
+                        message = res.content
+                        transaction_log_obj.create(
+                                                    {'message':message,
+                                                     'mismatch_details':True,
+                                                     'type':'category',
+                                                     'woo_instance_id':instance.id
+                                                    })
+                    continue
                 try:
                     response = res.json()
                 except Exception as e:
@@ -195,12 +198,11 @@ class woo_product_categ_ept(models.Model):
                                                  'type':'category',
                                                  'woo_instance_id':instance.id
                                                 })
-                    continue 
-                if instance.woo_version == 'old':                
-                    errors = response.get('errors','')
-                    if errors:
+                    continue
+                if instance.woo_version == 'old':    
+                    if errors := response.get('errors', ''):
                         message = errors[0].get('message')
-                        message = "%s :: %s"%(message,woo_product_categ.name)
+                        message = f"{message} :: {woo_product_categ.name}"
                         transaction_log_obj.create(
                                                     {'message':message,
                                                      'mismatch_details':True,
@@ -220,9 +222,13 @@ class woo_product_categ_ept(models.Model):
                         response_url = product_categ and product_categ.get('image','')
                     elif instance.woo_version == 'new':
                         response_url = product_categ and product_categ.get('image') and product_categ.get('image',{}).get('src','') or ''
-                    response_data.update({'response_url':response_url})                 
+                    response_data['response_url'] = response_url
                 if product_categ_id:
-                    response_data.update({'woo_categ_id':product_categ_id,'slug':slug,'exported_in_woo':True})
+                    response_data |= {
+                        'woo_categ_id': product_categ_id,
+                        'slug': slug,
+                        'exported_in_woo': True,
+                    }
                     woo_product_categ.write(response_data)
         return True
     
@@ -234,15 +240,14 @@ class woo_product_categ_ept(models.Model):
         for woo_categ in woo_product_categs:
             if woo_categ in updated_categs :
                 continue
-            product_categs=[]
-            product_categs.append(woo_categ)
+            product_categs = [woo_categ]
             for categ in product_categs:
                 if categ.parent_id and categ.parent_id not in product_categs and categ.parent_id not in updated_categs:
                     self.sync_product_category(instance, woo_product_categ=categ.parent_id)
                     product_categs.append(categ.parent_id)
-                    
+
             product_categs.reverse()
-            for woo_categ in product_categs:                
+            for woo_categ in product_categs:        
                 img_url = ''
                 if instance.is_image_url:                
                     if woo_categ.response_url:
@@ -257,25 +262,29 @@ class woo_product_categ_ept(models.Model):
                     elif woo_categ.url:
                         img_url = woo_categ.url
                 else:
-                    res = {}            
+                    res = {}
                     if woo_categ.image:
-                        res = img_file_upload.upload_image(instance,woo_categ.image,"%s_%s"%(woo_categ.name,woo_categ.id))
+                        res = img_file_upload.upload_image(
+                            instance,
+                            woo_categ.image,
+                            f"{woo_categ.name}_{woo_categ.id}",
+                        )
                     img_url = res and res.get('url',False) or ''
-                                                                
+
                 row_data = {'name':str(woo_categ.name),
                             'display':str(woo_categ.display),                            
                             'description':str(woo_categ.description or '')}
                 if woo_categ.slug:
-                    row_data.update({'slug':str(woo_categ.slug)})
+                    row_data['slug'] = str(woo_categ.slug)
                 img_url and row_data.update({'image' :img_url})
                 if instance.woo_version == 'new' and img_url:
-                    row_data.update({'image' :{'src':img_url}})
+                    row_data['image'] = {'src':img_url}
                 woo_categ.parent_id.woo_categ_id and row_data.update({'parent':woo_categ.parent_id.woo_categ_id})
                 if instance.woo_version == 'old':
                     data = {"product_category":row_data}
-                    res =wcapi.put('products/categories/%s'%(woo_categ.woo_categ_id),data)
+                    res = wcapi.put(f'products/categories/{woo_categ.woo_categ_id}', data)
                 elif instance.woo_version == 'new':
-                    row_data.update({'id':woo_categ.woo_categ_id})
+                    row_data['id'] = woo_categ.woo_categ_id
                     res =wcapi.post('products/categories/batch',{'update':[row_data]})
                 if not isinstance(res,requests.models.Response):
                     transaction_log_obj.create({'message':"Update Product Category \nResponse is not in proper format :: %s"%(res),
@@ -291,7 +300,7 @@ class woo_product_categ_ept(models.Model):
                                                      'type':'category',
                                                      'woo_instance_id':instance.id
                                                     })
-                    continue                                    
+                    continue
                 try:
                     response = res.json()
                 except Exception as e:
@@ -308,9 +317,8 @@ class woo_product_categ_ept(models.Model):
                                                  'woo_instance_id':instance.id
                                                 })
                     continue
-                if instance.woo_version == 'old':                                
-                    errors = response.get('errors','')
-                    if errors:
+                if instance.woo_version == 'old':                    
+                    if errors := response.get('errors', ''):
                         message = errors[0].get('message')
                         transaction_log_obj.create(
                                                     {'message':message,
@@ -318,27 +326,27 @@ class woo_product_categ_ept(models.Model):
                                                      'type':'category',
                                                      'woo_instance_id':instance.id
                                                     })
-                        continue                
+                        continue
                     else:
                         if instance.is_image_url:
                             updated_product_category = response.get('product_category')
                             res_image = updated_product_category.get('image')
                             slug = updated_product_category.get('slug')             
-                            res_image and woo_categ.write({'response_url':res_image,'slug':slug})                        
+                            res_image and woo_categ.write({'response_url':res_image,'slug':slug})
                 elif instance.woo_version == 'new':                    
                     if instance.is_image_url:
                         updated_product_category = response
                         res_image = updated_product_category.get('image') and updated_product_category.get('image').get('src','')
                         slug = updated_product_category.get('slug')
-                        res_image and woo_categ.write({'response_url':res_image,'slug':slug}) 
+                        res_image and woo_categ.write({'response_url':res_image,'slug':slug})
                 updated_categs.append(woo_categ)
         return True
     
     def import_all_categories(self,wcapi,instance,transaction_log_obj,page):
         if instance.woo_version == 'old':
-            res = wcapi.get("products/categories?filter[limit]=1000&page=%s"%(page))
+            res = wcapi.get(f"products/categories?filter[limit]=1000&page={page}")
         else:
-            res = wcapi.get("products/categories?per_page=100&page=%s"%(page))
+            res = wcapi.get(f"products/categories?per_page=100&page={page}")
         if not isinstance(res,requests.models.Response):            
             transaction_log_obj.create({'message':"Get All Product Category \nResponse is not in proper format :: %s"%(res),
                                          'mismatch_details':True,
@@ -364,8 +372,7 @@ class woo_product_categ_ept(models.Model):
                 })
             return []
         if instance.woo_version == 'old':
-            errors = response.get('errors','')
-            if errors:
+            if errors := response.get('errors', ''):
                 message = errors[0].get('message')
                 transaction_log_obj.create(
                                             {'message':message,
@@ -420,17 +427,21 @@ class woo_product_categ_ept(models.Model):
             product_categ_ids.append(categ.get('id'))
             categ_name_list.append(woo_product_categ_name.lower())
         for product_categ_id in product_categ_ids:
-            tmp_categ=list(filter(lambda categ1: categ1['id'] == product_categ_id, product_categories))
-            if tmp_categ:
+            if tmp_categ := list(
+                filter(
+                    lambda categ1: categ1['id'] == product_categ_id,
+                    product_categories,
+                )
+            ):
                 tmp_categ=tmp_categ[0]
                 if tmp_categ.get('parent') and tmp_categ.get('parent') not in product_categ_ids:
                     product_categ_ids.append(tmp_categ.get('parent'))
                     tmp_parent_categ=list(filter(lambda categ2: categ2['id'] == tmp_categ.get('parent'), product_categories))
                     tmp_parent_categ and categ_name_list.append(tmp_parent_categ[0].get('name').lower())
-                    
+
         product_categ_ids.reverse()
         for product_categ_id in product_categ_ids:
-            response=wcapi.get("products/categories/%s"%(product_categ_id))            
+            response = wcapi.get(f"products/categories/{product_categ_id}")
             if not isinstance(response,requests.models.Response):
                 transaction_log_obj.create({'message':"Get Product Category \nResponse is not in proper format :: %s"%(response),
                                          'mismatch_details':True,
@@ -461,8 +472,10 @@ class woo_product_categ_ept(models.Model):
                 categ=response
             product_category={'id':categ.get('id'),'name':categ.get('name')}
             categ_name = product_category.get('name')
-            if categ_name.lower() in categ_name_list:                
-                single_catg_res = wcapi.get("products/categories/%s"%(product_category.get('id')))
+            if categ_name.lower() in categ_name_list:        
+                single_catg_res = wcapi.get(
+                    f"products/categories/{product_category.get('id')}"
+                )
                 if not isinstance(single_catg_res,requests.models.Response):                    
                     transaction_log_obj.create({'message':"Get Product Category \nResponse is not in proper format :: %s"%(single_catg_res),
                                          'mismatch_details':True,
@@ -512,7 +525,7 @@ class woo_product_categ_ept(models.Model):
                 if woo_categ:                                        
                     woo_categ.write(vals)                    
                 else:                    
-                    woo_categ = self.create(vals)                
+                    woo_categ = self.create(vals)
         return woo_categ
     
     @api.multi

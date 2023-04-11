@@ -6,16 +6,18 @@ class product_pricelist(models.Model):
     @api.multi
     def get_product_price_ept(self,product,pricelist_id,partner=False):
         pricelist = self.browse(pricelist_id)
-        price = pricelist.get_product_price(product,1.0,partner=partner,uom_id=product.uom_id.id)
-        return price
+        return pricelist.get_product_price(
+            product, 1.0, partner=partner, uom_id=product.uom_id.id
+        )
         
     @api.multi
     def set_product_price_ept(self,product_id,pricelist_id,price,min_qty=1):
         product_pricelist_item_obj=self.env['product.pricelist.item']
-        domain = []
-        domain.append(('pricelist_id','=',pricelist_id))
-        domain.append(('product_id','=',product_id))
-        domain.append(('min_quantity','=',min_qty))
+        domain = [
+            ('pricelist_id', '=', pricelist_id),
+            ('product_id', '=', product_id),
+            ('min_quantity', '=', min_qty),
+        ]
         product_pricelist_item =product_pricelist_item_obj.search(domain)
         if product_pricelist_item:
             product_pricelist_item.write({'fixed_price':price})

@@ -24,14 +24,15 @@ class woo_payment_gateway(models.Model):
                                         })
             return False
         if res.status_code not in [200,201]:
-            message = res.content           
-            if message:
+            if message := res.content:
                 transaction_log_obj.create(
-                                            {'message':"Import Payment Gateway Error, %s"%(message),
-                                             'mismatch_details':True,
-                                             'type':'sales',
-                                             'woo_instance_id':instance.id
-                                            })
+                    {
+                        'message': f"Import Payment Gateway Error, {message}",
+                        'mismatch_details': True,
+                        'type': 'sales',
+                        'woo_instance_id': instance.id,
+                    }
+                )
                 return False
         try:
             response = res.json()

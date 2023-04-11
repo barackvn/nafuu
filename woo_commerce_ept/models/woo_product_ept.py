@@ -47,16 +47,16 @@ class woo_product_template_ept(models.Model):
     def woo_unpublished(self):
         instance=self.woo_instance_id
         wcapi = instance.connect_in_woo()
-        transaction_log_obj=self.env['woo.transaction.log']
         if self.woo_tmpl_id:
             info = {'status':'draft'}
             data = info
             if instance.woo_version == 'old':
-                data = {'product':info}                       
-                res = wcapi.put('products/%s'%(self.woo_tmpl_id),data)
+                data = {'product':info}
+                res = wcapi.put(f'products/{self.woo_tmpl_id}', data)
             else:
-                data.update({'id':self.woo_tmpl_id})
+                data['id'] = self.woo_tmpl_id
                 res = wcapi.post('products/batch',{'update':[data]})
+            transaction_log_obj=self.env['woo.transaction.log']
             if not isinstance(res,requests.models.Response):               
                 transaction_log_obj.create({'message': "Unpublish Product \nResponse is not in proper format :: %s"%(res),
                                              'mismatch_details':True,
@@ -81,27 +81,30 @@ class woo_product_template_ept(models.Model):
                              'woo_instance_id':instance.id
                             })
                 return False
-            if instance.woo_version == 'old':            
-                errors = response.get('errors','')
-                if errors:
+            if instance.woo_version == 'old':    
+                if errors := response.get('errors', ''):
                     message = errors[0].get('message')
                     transaction_log_obj.create(
-                                                {'message':"Can not Unpublish Template,  %s"%(message),
-                                                 'mismatch_details':True,
-                                                 'type':'product',
-                                                 'woo_instance_id':instance.id
-                                                })
-                else:                    
+                        {
+                            'message': f"Can not Unpublish Template,  {message}",
+                            'mismatch_details': True,
+                            'type': 'product',
+                            'woo_instance_id': instance.id,
+                        }
+                    )
+                else:
                     self.write({'website_published':False})
             elif instance.woo_version == 'new':
                 if response.get('data',{}) and response.get('data',{}).get('status') not in [200,201]:
                     message = response.get('message')
                     transaction_log_obj.create(
-                                                {'message':"Can not Unpublish Template,  %s"%(message),
-                                                 'mismatch_details':True,
-                                                 'type':'product',
-                                                 'woo_instance_id':instance.id
-                                                })
+                        {
+                            'message': f"Can not Unpublish Template,  {message}",
+                            'mismatch_details': True,
+                            'type': 'product',
+                            'woo_instance_id': instance.id,
+                        }
+                    )
                 else:                                            
                     self.write({'website_published':False})
         return True           
@@ -110,16 +113,16 @@ class woo_product_template_ept(models.Model):
     def woo_published(self):
         instance=self.woo_instance_id
         wcapi = instance.connect_in_woo()
-        transaction_log_obj=self.env['woo.transaction.log']
         if self.woo_tmpl_id:
             info = {'status':'publish'}
             data = info
             if instance.woo_version == 'old':
                 data = {'product':info}
-                res = wcapi.put('products/%s'%(self.woo_tmpl_id),data)
+                res = wcapi.put(f'products/{self.woo_tmpl_id}', data)
             else:
-                data.update({'id':self.woo_tmpl_id})
+                data['id'] = self.woo_tmpl_id
                 res = wcapi.post('products/batch',{'update':[data]})
+            transaction_log_obj=self.env['woo.transaction.log']
             if not isinstance(res,requests.models.Response):                
                 transaction_log_obj.create({'message': "Publish Product \nResponse is not in proper format :: %s"%(res),
                                              'mismatch_details':True,
@@ -134,7 +137,7 @@ class woo_product_template_ept(models.Model):
                                      'type':'product',
                                      'woo_instance_id':instance.id
                                     })
-                return True            
+                return True
             try:            
                 response = res.json()
             except Exception as e:
@@ -144,28 +147,31 @@ class woo_product_template_ept(models.Model):
                              'woo_instance_id':instance.id
                             })
                 return False
-            if instance.woo_version == 'old':            
-                errors = response.get('errors','')
-                if errors:
+            if instance.woo_version == 'old':    
+                if errors := response.get('errors', ''):
                     message = errors[0].get('message')
                     transaction_log_obj.create(
-                                                {'message':"Can not Publish Template,  %s"%(message),
-                                                 'mismatch_details':True,
-                                                 'type':'product',
-                                                 'woo_instance_id':instance.id
-                                                })
-                else:                    
+                        {
+                            'message': f"Can not Publish Template,  {message}",
+                            'mismatch_details': True,
+                            'type': 'product',
+                            'woo_instance_id': instance.id,
+                        }
+                    )
+                else:
                     self.write({'website_published':True})
-                    
+
             elif instance.woo_version == 'new':
                 if response.get('data',{}) and response.get('data',{}).get('status') not in [200,201]:
                     message = response.get('message')
                     transaction_log_obj.create(
-                                                {'message':"Can not Publish Template,  %s"%(message),
-                                                 'mismatch_details':True,
-                                                 'type':'product',
-                                                 'woo_instance_id':instance.id
-                                                })
+                        {
+                            'message': f"Can not Publish Template,  {message}",
+                            'mismatch_details': True,
+                            'type': 'product',
+                            'woo_instance_id': instance.id,
+                        }
+                    )
                 else:                    
                     self.write({'website_published':True})
         return True
@@ -175,28 +181,46 @@ class woo_product_template_ept(models.Model):
         obj_woo_product_categ=self.env['woo.product.categ.ept']
         categ_ids = []
         for woo_category in woo_categories:
-            woo_product_categ = obj_woo_product_categ.search([('woo_categ_id','=',woo_category.get('id')),('woo_instance_id','=',instance.id)],limit=1)
-            if not woo_product_categ:
-                woo_product_categ = obj_woo_product_categ.search([('slug','=',woo_category.get('slug')),('woo_instance_id','=',instance.id)],limit=1)
-            if woo_product_categ:
+            if woo_product_categ := obj_woo_product_categ.search(
+                [
+                    ('woo_categ_id', '=', woo_category.get('id')),
+                    ('woo_instance_id', '=', instance.id),
+                ],
+                limit=1,
+            ) or obj_woo_product_categ.search(
+                [
+                    ('slug', '=', woo_category.get('slug')),
+                    ('woo_instance_id', '=', instance.id),
+                ],
+                limit=1,
+            ):
                 woo_product_categ.write({'woo_categ_id':woo_category.get('id'),'name':woo_category.get('name'),'display':woo_category.get('display'),'slug':woo_category.get('slug'),'exported_in_woo':True})
                 obj_woo_product_categ.sync_product_category(instance,woo_product_categ=woo_product_categ,sync_images_with_product=sync_images_with_product)
-                categ_ids.append(woo_product_categ.id)                                                   
+                categ_ids.append(woo_product_categ.id)
             else:
                 woo_product_categ = obj_woo_product_categ.create({'woo_categ_id':woo_category.get('id'),'name':woo_category.get('name'),'display':woo_category.get('display'),'slug':woo_category.get('slug'),'woo_instance_id':instance.id,'exported_in_woo':True})
                 obj_woo_product_categ.sync_product_category(instance,woo_product_categ=woo_product_categ,sync_images_with_product=sync_images_with_product)
-                woo_product_categ and categ_ids.append(woo_product_categ.id)                        
+                woo_product_categ and categ_ids.append(woo_product_categ.id)
         return categ_ids
     
     @api.multi
     def sync_new_woo_tags_with_product(self,wcapi,instance,woo_tags):
-        obj_woo_product_tags=self.env['woo.tags.ept']        
+        obj_woo_product_tags=self.env['woo.tags.ept']
         tag_ids = []
         for woo_tag in woo_tags:
-            woo_product_tag = obj_woo_product_tags.search([('woo_tag_id','=',woo_tag.get('id')),('woo_instance_id','=',instance.id)],limit=1)
-            if not woo_product_tag:
-                woo_product_tag = obj_woo_product_tags.search([('slug','=',woo_tag.get('slug')),('woo_instance_id','=',instance.id)],limit=1)
-            if woo_product_tag:
+            if woo_product_tag := obj_woo_product_tags.search(
+                [
+                    ('woo_tag_id', '=', woo_tag.get('id')),
+                    ('woo_instance_id', '=', instance.id),
+                ],
+                limit=1,
+            ) or obj_woo_product_tags.search(
+                [
+                    ('slug', '=', woo_tag.get('slug')),
+                    ('woo_instance_id', '=', instance.id),
+                ],
+                limit=1,
+            ):
                 woo_product_tag.write({'name':woo_tag.get('name'),'slug':woo_tag.get('slug'),'exported_in_woo':True})
                 obj_woo_product_tags.sync_product_tags(instance,woo_product_tag=woo_product_tag)
                 tag_ids.append(woo_product_tag.id)
@@ -212,7 +236,9 @@ class woo_product_template_ept(models.Model):
         categ_ids = []
         for woo_category in woo_categories:
             ctg = woo_category.lower().replace('\'','\'\'')
-            self._cr.execute("select id from woo_product_categ_ept where LOWER(name) = '%s' and woo_instance_id = %s limit 1"%(ctg,instance.id))
+            self._cr.execute(
+                f"select id from woo_product_categ_ept where LOWER(name) = '{ctg}' and woo_instance_id = {instance.id} limit 1"
+            )
             woo_product_categ_id = self._cr.dictfetchall()
             woo_categ=False
             if woo_product_categ_id:
@@ -221,22 +247,24 @@ class woo_product_template_ept(models.Model):
                 woo_categ = woo_product_categ.sync_product_category(instance,woo_product_categ=woo_categ,sync_images_with_product=sync_images_with_product)                    
             else:
                 woo_categ = woo_product_categ.sync_product_category(instance,woo_product_categ_name=woo_category,sync_images_with_product=sync_images_with_product)
-                woo_categ and categ_ids.append(woo_categ.id)                        
+                woo_categ and categ_ids.append(woo_categ.id)
         return categ_ids
     
     @api.multi
     def sync_woo_tags_with_product(self,wcapi,instance,woo_tags):
         transaction_log_obj=self.env['woo.transaction.log']
-        woo_product_tags=self.env['woo.tags.ept']        
+        woo_product_tags=self.env['woo.tags.ept']
         tag_ids = []
         for woo_tag in woo_tags:
             tag = woo_tag.lower().replace('\'','\'\'')
-            self._cr.execute("select id from woo_tags_ept where LOWER(name) = '%s' and woo_instance_id = %s limit 1"%(tag,instance.id))
+            self._cr.execute(
+                f"select id from woo_tags_ept where LOWER(name) = '{tag}' and woo_instance_id = {instance.id} limit 1"
+            )
             woo_product_tag_id = self._cr.dictfetchall()
             woo_product_tag=False
             if woo_product_tag_id:
                 woo_product_tag = woo_product_tags.browse(woo_product_tag_id[0].get('id'))
-                tag_ids.append(woo_product_tag.id)                                                  
+                tag_ids.append(woo_product_tag.id)
             else:
                 tag_res=wcapi.get("products/tags?fields=id,name")
                 if not isinstance(tag_res,requests.models.Response):                    
@@ -253,7 +281,7 @@ class woo_product_template_ept(models.Model):
                                          'type':'product',
                                          'woo_instance_id':instance.id
                                         })
-                    continue                
+                    continue
                 try:            
                     tag_response = tag_res.json()
                 except Exception as e:
@@ -269,7 +297,7 @@ class woo_product_template_ept(models.Model):
                 for product_tag in product_tags:
                     tag_name = product_tag.get('name')
                     if tag_name == woo_tag:
-                        single_tag_res = wcapi.get("products/tags/%s"%(product_tag.get('id')))
+                        single_tag_res = wcapi.get(f"products/tags/{product_tag.get('id')}")
                         if not isinstance(single_tag_res,requests.models.Response):                            
                             transaction_log_obj.create({'message': "Get Product Tags\nResponse is not in proper format :: %s"%(single_tag_res),
                                              'mismatch_details':True,
@@ -287,19 +315,23 @@ class woo_product_template_ept(models.Model):
                                         })
                             continue
                         single_tag = single_tag_response.get('product_tag')
-                        
+
                         tag_vals = {'name':woo_tag,'woo_instance_id':instance.id,'description':single_tag.get('description'),'exported_in_woo':True,'woo_tag_id':single_tag.get('id')}
-                            
+
                         woo_product_tag = woo_product_tags.create(tag_vals)
                         woo_product_tag and tag_ids.append(woo_product_tag.id)
-                        break        
+                        break
         return tag_ids    
 
     def import_all_attribute_terms(self,wcapi,instance,woo_attribute_id,transaction_log_obj,page):
         if instance.woo_version=='new':
-            res = wcapi.get("products/attributes/%s/terms?per_page=100&page=%s"%(woo_attribute_id.woo_attribute_id,page))
+            res = wcapi.get(
+                f"products/attributes/{woo_attribute_id.woo_attribute_id}/terms?per_page=100&page={page}"
+            )
         else:
-            res = wcapi.get("products/attributes/%s/terms?filter[limit]=1000&page=%s"%(woo_attribute_id.woo_attribute_id,page))
+            res = wcapi.get(
+                f"products/attributes/{woo_attribute_id.woo_attribute_id}/terms?filter[limit]=1000&page={page}"
+            )
         if not isinstance(res,requests.models.Response):            
             transaction_log_obj.create({'message':"Get All Attibute Terms \nResponse is not in proper format :: %s"%(res),
                                          'mismatch_details':True,
@@ -325,8 +357,7 @@ class woo_product_template_ept(models.Model):
                 })
             return []
         if instance.woo_version == 'old':
-            errors = response.get('errors','')
-            if errors:
+            if errors := response.get('errors', ''):
                 message = errors[0].get('message')
                 transaction_log_obj.create(
                                             {'message':message,
@@ -345,15 +376,19 @@ class woo_product_template_ept(models.Model):
         obj_woo_attribute=self.env['woo.product.attribute.ept']
         obj_woo_attribute_term=self.env['woo.product.attribute.term.ept']
         odoo_attribute_value_obj=self.env['product.attribute.value']
-        
+
         wcapi = instance.connect_in_woo()
         woo_attributes = obj_woo_attribute.search([])
         attributes_term_data=[]
         for woo_attribute in woo_attributes:
             if instance.woo_version=='new':
-                response = wcapi.get("products/attributes/%s/terms?per_page=100"%(woo_attribute.woo_attribute_id))
+                response = wcapi.get(
+                    f"products/attributes/{woo_attribute.woo_attribute_id}/terms?per_page=100"
+                )
             else:
-                response = wcapi.get("products/attributes/%s/terms?filter[limit]=1000"%(woo_attribute.woo_attribute_id))
+                response = wcapi.get(
+                    f"products/attributes/{woo_attribute.woo_attribute_id}/terms?filter[limit]=1000"
+                )
             try:
                 attributes_term_data = response.json()
             except Exception as e:
@@ -366,11 +401,14 @@ class woo_product_template_ept(models.Model):
             if instance.woo_version=='old':
                 attributes_term_data = attributes_term_data.get('product_attribute_terms')
             if not isinstance(attributes_term_data, list):
-                transaction_log_obj.create({'message':"Response is not in proper format :: %s"%(attributes_term_data),
-                                             'mismatch_details':True,
-                                             'type':'product',
-                                             'woo_instance_id':instance.id
-                                            })
+                transaction_log_obj.create(
+                    {
+                        'message': f"Response is not in proper format :: {attributes_term_data}",
+                        'mismatch_details': True,
+                        'type': 'product',
+                        'woo_instance_id': instance.id,
+                    }
+                )
                 continue
             total_pages = 1
             if instance.woo_version == 'old':
@@ -388,8 +426,16 @@ class woo_product_template_ept(models.Model):
                     odoo_attribute_value=odoo_attribute_value_obj.search([('name','=ilike',attribute_term.get('name')),('attribute_id','=',woo_attribute.attribute_id.id)],limit=1)
                     if not odoo_attribute_value:
                         odoo_attribute_value=odoo_attribute_value.with_context(active_id=False).create({'name':attribute_term.get('name'),'attribute_id':woo_attribute.attribute_id.id})
-                    woo_attribute_term = obj_woo_attribute_term.search([('attribute_value_id','=',odoo_attribute_value.id),('attribute_id','=',woo_attribute.attribute_id.id),('woo_attribute_id','=',woo_attribute.id),('woo_instance_id','=',instance.id),('exported_in_woo','=',False)],limit=1)
-                    if woo_attribute_term:
+                    if woo_attribute_term := obj_woo_attribute_term.search(
+                        [
+                            ('attribute_value_id', '=', odoo_attribute_value.id),
+                            ('attribute_id', '=', woo_attribute.attribute_id.id),
+                            ('woo_attribute_id', '=', woo_attribute.id),
+                            ('woo_instance_id', '=', instance.id),
+                            ('exported_in_woo', '=', False),
+                        ],
+                        limit=1,
+                    ):
                         woo_attribute_term.write({'woo_attribute_term_id':attribute_term.get('id'),'count':attribute_term.get('count'),'slug':attribute_term.get('slug'),'exported_in_woo':True})
                     else:
                         obj_woo_attribute_term.create({'name':attribute_term.get('name'),'woo_attribute_term_id':attribute_term.get('id'),
@@ -408,9 +454,9 @@ class woo_product_template_ept(models.Model):
     
     def import_all_attributes(self,wcapi,instance,transaction_log_obj,page):
         if instance.woo_version=='new':
-            res=wcapi.get('products/attributes?per_page=100&page=%s'%(page))
+            res = wcapi.get(f'products/attributes?per_page=100&page={page}')
         else:
-            res=wcapi.get('products/attributes?filter[limit]=1000&page=%s'%(page))
+            res = wcapi.get(f'products/attributes?filter[limit]=1000&page={page}')
         if not isinstance(res,requests.models.Response):            
             transaction_log_obj.create({'message':"Get All Attibutes \nResponse is not in proper format :: %s"%(res),
                                          'mismatch_details':True,
@@ -436,8 +482,7 @@ class woo_product_template_ept(models.Model):
                 })
             return []
         if instance.woo_version == 'old':
-            errors = response.get('errors','')
-            if errors:
+            if errors := response.get('errors', ''):
                 message = errors[0].get('message')
                 transaction_log_obj.create(
                                             {'message':message,
@@ -455,7 +500,7 @@ class woo_product_template_ept(models.Model):
         transaction_log_obj=self.env['woo.transaction.log']
         obj_woo_attribute=self.env['woo.product.attribute.ept']
         odoo_attribute_obj=self.env['product.attribute']
-        
+
         wcapi = instance.connect_in_woo()
         if instance.woo_version=='new':
             response = wcapi.get("products/attributes?per_page=100")
@@ -478,11 +523,14 @@ class woo_product_template_ept(models.Model):
         elif instance.woo_version == 'new':                    
             total_pages = response and response.headers.get('x-wp-totalpages') or 1
         if not isinstance(attributes_data, list):
-            transaction_log_obj.create({'message':"Response is not in proper format :: %s"%(attributes_data),
-                                         'mismatch_details':True,
-                                         'type':'product',
-                                         'woo_instance_id':instance.id
-                                        })
+            transaction_log_obj.create(
+                {
+                    'message': f"Response is not in proper format :: {attributes_data}",
+                    'mismatch_details': True,
+                    'type': 'product',
+                    'woo_instance_id': instance.id,
+                }
+            )
             return True
         if int(total_pages) >=2:
             for page in range(2,int(total_pages)+1):            
@@ -495,8 +543,14 @@ class woo_product_template_ept(models.Model):
                 odoo_attribute=odoo_attribute_obj.search([('name','=ilike',attribute.get('name'))],limit=1)
                 if not odoo_attribute:
                     odoo_attribute=odoo_attribute.create({'name':attribute.get('name')})
-                woo_attribute = obj_woo_attribute.search([('attribute_id','=',odoo_attribute.id),('woo_instance_id','=',instance.id),('exported_in_woo','=',False)],limit=1)
-                if woo_attribute:
+                if woo_attribute := obj_woo_attribute.search(
+                    [
+                        ('attribute_id', '=', odoo_attribute.id),
+                        ('woo_instance_id', '=', instance.id),
+                        ('exported_in_woo', '=', False),
+                    ],
+                    limit=1,
+                ):
                     woo_attribute.write({'woo_attribute_id':attribute.get('id'),'order_by':attribute.get('order_by'),'slug':attribute.get('slug'),'exported_in_woo':True,'has_archives':attribute.get('has_archives')})
                 else:
                     obj_woo_attribute.create({'name':attribute.get('name'),'woo_attribute_id':attribute.get('id'),'order_by':attribute.get('order_by'),
@@ -561,7 +615,7 @@ class woo_product_template_ept(models.Model):
         return {attribute.id:woo_attribute_id}
 
     def import_all_draft_products(self,wcapi,instance,transaction_log_obj,page):
-        res=wcapi.get('products?filter[post_status]=draft&page=%s'%(page))
+        res = wcapi.get(f'products?filter[post_status]=draft&page={page}')
         if not isinstance(res,requests.models.Response):            
             transaction_log_obj.create({'message': "Get All Draft Products\nResponse is not in proper format :: %s"%(res),
                                              'mismatch_details':True,
@@ -590,9 +644,9 @@ class woo_product_template_ept(models.Model):
     
     def import_all_products(self,wcapi,instance,transaction_log_obj,page):
         if instance.woo_version == 'new':
-            res=wcapi.get('products?per_page=100&page=%s'%(page))
-        else:            
-            res=wcapi.get('products?page=%s'%(page))
+            res = wcapi.get(f'products?per_page=100&page={page}')
+        else:        
+            res = wcapi.get(f'products?page={page}')
         if not isinstance(res,requests.models.Response):            
             transaction_log_obj.create({'message': "Get All Products\nResponse is not in proper format :: %s"%(res),
                                              'mismatch_details':True,
@@ -618,8 +672,7 @@ class woo_product_template_ept(models.Model):
                         })
             return []
         if instance.woo_version == 'old':
-            errors = response.get('errors','')
-            if errors:
+            if errors := response.get('errors', ''):
                 message = errors[0].get('message')
                 transaction_log_obj.create(
                                             {'message':message,
@@ -640,30 +693,36 @@ class woo_product_template_ept(models.Model):
         woo_attribute_obj=self.env['woo.product.attribute.ept']
         woo_attribute_term_obj=self.env['woo.product.attribute.term.ept']
 
-        for variation in result.get('variations'):                
+        for variation in result.get('variations'):            
             sku = variation.get('sku')
             price = variation.get('regular_price') or variation.get('sale_price')
             attribute_value_ids = []
             domain = []
             odoo_product = False
             variation_attributes = variation.get('attributes')
-            
+
             for variation_attribute in variation_attributes:
                 attribute_val = variation_attribute.get('option')
                 attribute_name = variation_attribute.get('name')
                 if instance.attribute_type=='text':
                     for attribute in result.get('attributes'):
-                        if attribute.get('variation') and attribute.get('name'):
-                            if attribute.get('name').replace(" ", "-").lower() == attribute_name:
-                                attribute_name = attribute.get('name')
-                                break
-                    product_attribute = product_attribute_obj.search([('name','=ilike',attribute_name)],limit=1)
-                    if product_attribute:
+                        if (
+                            attribute.get('variation')
+                            and attribute.get('name')
+                            and attribute.get('name').replace(" ", "-").lower()
+                            == attribute_name
+                        ):
+                            attribute_name = attribute.get('name')
+                            break
+                    if product_attribute := product_attribute_obj.search(
+                        [('name', '=ilike', attribute_name)], limit=1
+                    ):
                         product_attribute_value = product_attribute_value_obj.search([('attribute_id','=',product_attribute.id),('name','=ilike',attribute_val)],limit=1)
                         product_attribute_value and attribute_value_ids.append(product_attribute_value.id)
-                if instance.attribute_type=='select':
-                    woo_product_attribute = woo_attribute_obj.search([('name','=ilike',attribute_name)],limit=1)
-                    if woo_product_attribute:
+                if woo_product_attribute := woo_attribute_obj.search(
+                    [('name', '=ilike', attribute_name)], limit=1
+                ):
+                    if instance.attribute_type=='select':
                         woo_product_attribute_term = woo_attribute_term_obj.search([('woo_attribute_id','=',woo_product_attribute.woo_attribute_id),('name','=ilike',attribute_val)],limit=1)
                         if not woo_product_attribute_term:
                             woo_product_attribute_term = woo_attribute_term_obj.search([('woo_attribute_id','=',woo_product_attribute.woo_attribute_id),('slug','=ilike',attribute_val)],limit=1)
@@ -674,11 +733,18 @@ class woo_product_template_ept(models.Model):
                 domain.append(tpl)
             domain and domain.append(('product_tmpl_id','=',product_template.id))
             if domain:    
-                odoo_product = odoo_product_obj.search(domain) 
+                odoo_product = odoo_product_obj.search(domain)
             odoo_product and odoo_product.write({'default_code':sku})
             if odoo_product and sync_price_with_product:
-                pricelist_item=self.env['product.pricelist.item'].search([('pricelist_id','=',instance.pricelist_id.id),('product_id','=',odoo_product.id)],limit=1)
-                if not pricelist_item:
+                if pricelist_item := self.env['product.pricelist.item'].search(
+                    [
+                        ('pricelist_id', '=', instance.pricelist_id.id),
+                        ('product_id', '=', odoo_product.id),
+                    ],
+                    limit=1,
+                ):
+                    pricelist_item.write({'fixed_price':price})
+                else:
                     instance.pricelist_id.write({
                         'item_ids': [(0,0,{
                             'applied_on': '0_product_variant',
@@ -686,8 +752,6 @@ class woo_product_template_ept(models.Model):
                             'compute_price': 'fixed',
                             'fixed_price': price})]
                         })
-                else:
-                    pricelist_item.write({'fixed_price':price})
                 odoo_product.write({'list_price':price})
         return True
     
@@ -733,8 +797,7 @@ class woo_product_template_ept(models.Model):
     def set_variant_images(self,odoo_product_images):
         for odoo_product_image in odoo_product_images:
             binary_img_data = odoo_product_image.get('image',False)
-            odoo_product = odoo_product_image.get('odoo_product',False)
-            if odoo_product:
+            if odoo_product := odoo_product_image.get('odoo_product', False):
                 odoo_product.write({'image':binary_img_data})
     
     @api.multi
@@ -742,24 +805,24 @@ class woo_product_template_ept(models.Model):
         woo_skus = []
         odoo_skus = []
         variations = result.get('variations')
-        
+
         if instance.woo_version == "new":
             template_title = result.get('name')
         else:
             template_title = result.get('title')
-            
+
         product_count = len(variations)
-        
+
         importable = True
         message = ""
-        
+
         if not odoo_product and not woo_product:
             if product_count != 0:
                 attributes=1
                 for attribute in result.get('attributes'):
                     if attribute.get('variation'):
                         attributes*=len(attribute.get('options'))
-                
+
             product_attributes={}
             for variantion in variations:
                 sku = variantion.get("sku")
@@ -767,62 +830,58 @@ class woo_product_template_ept(models.Model):
                 attributes and product_attributes.update({sku:attributes})
                 sku and woo_skus.append(sku)
             if not product_attributes and result.get('type')=='variable':
-                message="Attributes are not set in any variation of Product: %s and ID: %s."%(template_title,result.get("id"))                          
+                message = f'Attributes are not set in any variation of Product: {template_title} and ID: {result.get("id")}.'
                 importable = False
                 return importable,message
             if woo_skus:
                 woo_skus = list(filter(lambda x: len(x)>0, woo_skus))
             total_woo_sku = len(set(woo_skus))
-            if not len(woo_skus) == total_woo_sku:
-                message="Duplicate SKU found in Product: %s and ID: %s."%(template_title,result.get("id"))                          
+            if len(woo_skus) != total_woo_sku:
+                message = f'Duplicate SKU found in Product: {template_title} and ID: {result.get("id")}.'
                 importable = False
                 return importable,message
-        woo_skus=[]    
+        woo_skus=[]
         if odoo_product:
             odoo_template = odoo_product.product_tmpl_id
-            if not (product_count == 0 and odoo_template.product_variant_count == 1):
-                if product_count == odoo_template.product_variant_count:
-                    for woo_sku,odoo_sku in zip(result.get('variations'),odoo_template.product_variant_ids):
-                        woo_skus.append(woo_sku.get('sku'))
-                        odoo_sku.default_code and odoo_skus.append(odoo_sku.default_code)
-                    
-                    woo_skus = list(filter(lambda x: len(x)>0, woo_skus))
-                    odoo_skus = list(filter(lambda x: len(x)>0, odoo_skus)) 
-                    
-                    total_woo_sku = len(set(woo_skus))
-                    if not len(woo_skus) == total_woo_sku:
-                        message="Duplicate SKU found in Product: %s and ID: %s."%(template_title,result.get("id"))                          
-                        importable = False
-                        return importable,message
-                    
-        if woo_product:
-            woo_skus = []
-            for woo_sku in result.get('variations'):
-                woo_skus.append(woo_sku.get('sku'))
+            if (
+                product_count != 0 or odoo_template.product_variant_count != 1
+            ) and product_count == odoo_template.product_variant_count:
+                for woo_sku,odoo_sku in zip(result.get('variations'),odoo_template.product_variant_ids):
+                    woo_skus.append(woo_sku.get('sku'))
+                    odoo_sku.default_code and odoo_skus.append(odoo_sku.default_code)
 
+                woo_skus = list(filter(lambda x: len(x)>0, woo_skus))
+                odoo_skus = list(filter(lambda x: len(x)>0, odoo_skus)) 
+
+                total_woo_sku = len(set(woo_skus))
+                if len(woo_skus) != total_woo_sku:
+                    message = f'Duplicate SKU found in Product: {template_title} and ID: {result.get("id")}.'
+                    importable = False
+                    return importable,message
+
+        if woo_product:
+            woo_skus = [woo_sku.get('sku') for woo_sku in result.get('variations')]
             total_woo_sku = len(set(woo_skus))
-            if not len(woo_skus) == total_woo_sku:
-                message="Duplicate SKU found in Product: %s and ID: %s."%(template_title,result.get("id"))                          
+            if len(woo_skus) != total_woo_sku:
+                message = f'Duplicate SKU found in Product: {template_title} and ID: {result.get("id")}.'
                 importable = False
                 return importable,message
-        
+
         return importable,message
     
     @api.multi
     def sync_gallery_images(self,instance,result,woo_template,odoo_product_images,woo_product_img):
         images = result.get('images')
         existing_gallery_img_keys = {}
-        if not instance.is_image_url:                
+        if not instance.is_image_url:            
             for gallery_img in woo_template.woo_gallery_image_ids:
                 if not gallery_img.image:
                     continue
-                key=hashlib.md5(gallery_img.image).hexdigest()
-                if not key:
-                    continue
-                existing_gallery_img_keys.update({key:gallery_img})            
+                if key := hashlib.md5(gallery_img.image).hexdigest():
+                    existing_gallery_img_keys[key] = gallery_img
         for image in images:
             if str(image.get('name').encode('utf-8')) == 'Placeholder' or not image.get('id'):
-                continue                
+                continue
             image_id = image.get('id')
             res_image_src = image.get('src')
             position = image.get('position')
@@ -845,7 +904,7 @@ class woo_product_template_ept(models.Model):
                                 odoo_product_images and self.set_variant_images(odoo_product_images)
                 except Exception:
                     pass                    
-            
+
             if res_image_src:
                 if position == 0:
                     if not instance.is_image_url and not result.get('variations'):                
@@ -853,25 +912,30 @@ class woo_product_template_ept(models.Model):
                     if not instance.is_image_url and result.get('variations'):
                         woo_template.product_tmpl_id.write({'image': binary_img_data})
                         odoo_product_images and self.set_variant_images(odoo_product_images)
-                woo_product_tmp_img = woo_product_img.search([('woo_product_tmpl_id','=',woo_template.id),('woo_instance_id','=',instance.id),('woo_image_id','=',image_id)],limit=1)
-                if woo_product_tmp_img:
+                if woo_product_tmp_img := woo_product_img.search(
+                    [
+                        ('woo_product_tmpl_id', '=', woo_template.id),
+                        ('woo_instance_id', '=', instance.id),
+                        ('woo_image_id', '=', image_id),
+                    ],
+                    limit=1,
+                ):
                     if instance.is_image_url:
                         woo_product_tmp_img.write({'response_url':res_image_src,'sequence':position})
                     else:
                         woo_product_tmp_img.write({'image':binary_img_data,'sequence':position})
-                else:                                                                      
-                    if instance.is_image_url:
-                        woo_product_img.create({'woo_instance_id':instance.id,'sequence':position,'woo_product_tmpl_id':woo_template.id,'response_url':res_image_src,'woo_image_id':image_id})
-                    else:
-                        woo_product_img.create({'woo_instance_id':instance.id,'sequence':position,'woo_product_tmpl_id':woo_template.id,'image':binary_img_data,'woo_image_id':image_id})
+                elif instance.is_image_url:
+                    woo_product_img.create({'woo_instance_id':instance.id,'sequence':position,'woo_product_tmpl_id':woo_template.id,'response_url':res_image_src,'woo_image_id':image_id})
+                else:
+                    woo_product_img.create({'woo_instance_id':instance.id,'sequence':position,'woo_product_tmpl_id':woo_template.id,'image':binary_img_data,'woo_image_id':image_id})
     
     @api.multi
     def get_product_response(self,instance,woo_tmpl_id,wcapi,transaction_log_obj):
         results=[]
         if woo_tmpl_id:
-            res=wcapi.get('products/%s'%(woo_tmpl_id))            
+            res = wcapi.get(f'products/{woo_tmpl_id}')
         else:
-            res=wcapi.get('products?per_page=100')                               
+            res=wcapi.get('products?per_page=100')
         if not isinstance(res,requests.models.Response):                                                         
             transaction_log_obj.create({'message': "Get Products\nResponse is not in proper format :: %s"%(res),
                                          'mismatch_details':True,
@@ -887,7 +951,7 @@ class woo_product_template_ept(models.Model):
                                  'woo_instance_id':instance.id
                                 })
             return False
-        total_pages = res.headers.get('x-wp-totalpages',0)         
+        total_pages = res.headers.get('x-wp-totalpages',0)
         try:            
             res = res.json()
         except Exception as e:
@@ -897,10 +961,7 @@ class woo_product_template_ept(models.Model):
                          'woo_instance_id':instance.id
                         })
             return []
-        if woo_tmpl_id:            
-            results = [res]
-        else:
-            results = res
+        results = [res] if woo_tmpl_id else res
         if int(total_pages) >=2:
             for page in range(2,int(total_pages)+1):            
                 results = results + self.import_all_products(wcapi,instance,transaction_log_obj,page)
@@ -910,7 +971,7 @@ class woo_product_template_ept(models.Model):
                 woo_id=result.get('id')
                 for variant in result.get('variations'):
                     try:            
-                        variants.append(wcapi.get('products/%s/variations/%s'%(woo_id,variant)).json())
+                        variants.append(wcapi.get(f'products/{woo_id}/variations/{variant}').json())
                     except Exception as e:
                         transaction_log_obj.create({'message':"Json Error : While Import Product Variants from WooCommerce for instance %s. \n%s"%(instance.name,e),
                                      'mismatch_details':True,
@@ -921,10 +982,9 @@ class woo_product_template_ept(models.Model):
                 result.update({'variations':variants})
         return results
         
-    @api.model    
+    @api.model
     def create_woo_product(self,woo_product_obj,vals,result,instance):
-        woo_prodcut = woo_product_obj.create(vals)
-        return woo_prodcut
+        return woo_product_obj.create(vals)
     
     @api.model
     def update_woo_product(self,vals,woo_product,result,instance):
@@ -933,8 +993,7 @@ class woo_product_template_ept(models.Model):
     
     @api.model
     def create_woo_template(self,vals,result,instance):
-        woo_template=self.create(vals)
-        return woo_template
+        return self.create(vals)
     
     @api.model
     def update_woo_template(self,vals,woo_template,result,instance):

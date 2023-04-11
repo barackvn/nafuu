@@ -56,7 +56,7 @@ class OAuth(object):
 
         query_string = urlencode(params)
 
-        return "%s?%s" % (url, query_string)
+        return f"{url}?{query_string}"
 
     def generate_oauth_signature(self, params, url):
         """ Generate OAuth Signature """
@@ -70,7 +70,7 @@ class OAuth(object):
                         for key, value in params.items()]
 
         query_string = "%26".join(query_params)
-        string_to_sign = "%s&%s&%s" % (self.method, base_request_uri, query_string)
+        string_to_sign = f"{self.method}&{base_request_uri}&{query_string}"
 
         consumer_secret = str(self.consumer_secret)
         if self.version not in ["v1", "v2"]:
@@ -87,11 +87,11 @@ class OAuth(object):
     @staticmethod
     def sorted_params(params):
         ordered = OrderedDict()
-        base_keys = sorted(set(k.split('[')[0] for k in params.keys()))
+        base_keys = sorted({k.split('[')[0] for k in params.keys()})
 
         for base in base_keys:
             for key in params.keys():
-                if key == base or key.startswith(base + '['):
+                if key == base or key.startswith(f'{base}['):
                     ordered[key] = params[key]
 
         return ordered
@@ -131,7 +131,7 @@ class OAuth(object):
     @staticmethod
     def generate_nonce():
         """ Generate nonce number """
-        nonce = ''.join([str(randint(0, 9)) for i in range(8)])
+        nonce = ''.join([str(randint(0, 9)) for _ in range(8)])
         return HMAC(
             nonce.encode(),
             "secret".encode(),

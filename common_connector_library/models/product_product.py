@@ -10,17 +10,10 @@ class product_product(models.Model):
             actual_stock = getattr(product, stock_type)
             if actual_stock >= 1.00:
                 if fix_stock_type == 'fix':
-                    if fix_stock_value >= actual_stock:
-                        return actual_stock
-                    else:
-                        return fix_stock_value
-    
+                    return actual_stock if fix_stock_value >= actual_stock else fix_stock_value
                 elif fix_stock_type == 'percentage':
                     quantity = int((actual_stock * fix_stock_value) / 100.0)
-                    if quantity >= actual_stock:
-                        return actual_stock
-                    else:
-                        return quantity
+                    return min(quantity, actual_stock)
             return actual_stock
         except Exception as e:
             raise Warning(e)

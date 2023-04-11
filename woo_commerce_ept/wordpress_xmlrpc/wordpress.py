@@ -21,11 +21,7 @@ class WordPressBase(object):
 
         for key, value in self.definition.items():
             # if the definition was not a FieldMap, create a simple FieldMap
-            if isinstance(value, FieldMap):
-                self._def[key] = value
-            else:
-                self._def[key] = FieldMap(value)
-
+            self._def[key] = value if isinstance(value, FieldMap) else FieldMap(value)
             # convert and store the value on this instance if non-empty
             try:
                 converted_value = self._def[key].convert_to_python(xmlrpc)
@@ -43,11 +39,11 @@ class WordPressBase(object):
         data = {}
         for var, fmap in self._def.items():
             if hasattr(self, var):
-                data.update(fmap.get_outputs(getattr(self, var)))
+                data |= fmap.get_outputs(getattr(self, var))
         return data
 
     def __repr__(self):
-        return '<%s: %s>' % (self.__class__.__name__, str(self).encode('utf-8'))
+        return f"<{self.__class__.__name__}: {str(self).encode('utf-8')}>"
 
 
 class WordPressTaxonomy(WordPressBase):
@@ -64,9 +60,7 @@ class WordPressTaxonomy(WordPressBase):
     }
 
     def __str__(self):
-        if hasattr(self, 'name'):
-            return self.name
-        return unicode('')
+        return self.name if hasattr(self, 'name') else unicode('')
 
 
 class WordPressTerm(WordPressBase):
@@ -83,9 +77,7 @@ class WordPressTerm(WordPressBase):
     }
 
     def __str__(self):
-        if hasattr(self, 'name'):
-            return self.name
-        return unicode('')
+        return self.name if hasattr(self, 'name') else unicode('')
 
 
 class WordPressPost(WordPressBase):
@@ -118,9 +110,7 @@ class WordPressPost(WordPressBase):
     }
 
     def __str__(self):
-        if hasattr(self, 'title'):
-            return self.title
-        return unicode('')
+        return self.title if hasattr(self, 'title') else unicode('')
 
 
 class WordPressPage(WordPressPost):
@@ -148,9 +138,7 @@ class WordPressComment(WordPressBase):
     }
 
     def __str__(self):
-        if hasattr(self, 'content'):
-            return self.content
-        return unicode('')
+        return self.content if hasattr(self, 'content') else unicode('')
 
 
 class WordPressBlog(WordPressBase):
@@ -163,9 +151,7 @@ class WordPressBlog(WordPressBase):
     }
 
     def __str__(self):
-        if hasattr(self, 'name'):
-            return self.name
-        return unicode('')
+        return self.name if hasattr(self, 'name') else unicode('')
 
 
 class WordPressAuthor(WordPressBase):
@@ -176,9 +162,7 @@ class WordPressAuthor(WordPressBase):
     }
 
     def __str__(self):
-        if hasattr(self, 'display_name'):
-            return self.display_name
-        return unicode('')
+        return self.display_name if hasattr(self, 'display_name') else unicode('')
 
 
 class WordPressUser(WordPressBase):
@@ -198,9 +182,7 @@ class WordPressUser(WordPressBase):
     }
 
     def __str__(self):
-        if hasattr(self, 'nickname'):
-            return self.nickname
-        return unicode('')
+        return self.nickname if hasattr(self, 'nickname') else unicode('')
 
 
 class WordPressMedia(WordPressBase):
@@ -217,9 +199,7 @@ class WordPressMedia(WordPressBase):
     }
 
     def __str__(self):
-        if hasattr(self, 'title'):
-            return self.title
-        return unicode('')
+        return self.title if hasattr(self, 'title') else unicode('')
 
 
 class WordPressOption(WordPressBase):
@@ -232,7 +212,7 @@ class WordPressOption(WordPressBase):
 
     def __str__(self):
         if hasattr(self, 'name') and hasattr(self, 'value'):
-            return '%s="%s"' % (self.name, self.value)
+            return f'{self.name}="{self.value}"'
         return unicode('')
 
 
@@ -254,6 +234,4 @@ class WordPressPostType(WordPressBase):
     }
 
     def __str__(self):
-        if hasattr(self, 'name'):
-            return self.name
-        return unicode('')
+        return self.name if hasattr(self, 'name') else unicode('')

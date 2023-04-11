@@ -70,18 +70,17 @@ class stock_picking(models.Model):
                                               ('state','in',('confirmed','assigned','partially_available'))])
                 is_kit_product=True
             """ If No one moves find..Forcefully create the moves if allow extra move=True """
-            if not move_lines:
-                if allow_extra_move == True:
-                    move=move_obj.create({       
-                                    'product_id':product_id,
-                                    'product_uom_qty':float(qty) or 0,
-                                    'picking_id':picking_id,
-                                    'name':product.name,
-                                    'location_id':picking_obj.location_id.id, 
-                                    'location_dest_id':picking_obj.location_dest_id.id,
-                                     })
-                    move._action_confirm()
-                    move._action_assign()
+            if not move_lines and allow_extra_move == True:
+                move=move_obj.create({       
+                                'product_id':product_id,
+                                'product_uom_qty':float(qty) or 0,
+                                'picking_id':picking_id,
+                                'name':product.name,
+                                'location_id':picking_obj.location_id.id, 
+                                'location_dest_id':picking_obj.location_dest_id.id,
+                                 })
+                move._action_confirm()
+                move._action_assign()
             """ If moves_lines and not Kit Product check the qty if qty less than zero break the tranc..
             if qty not less than zero calculate remaning qty of move line and find out the operation which is done qty less
             than or equal to zero.done qty of operation..then put the picking in to package. """
@@ -131,19 +130,18 @@ class stock_picking(models.Model):
                                     'location_id':picking_obj.location_id.id, 
                                     'location_dest_id':picking_obj.location_dest_id.id,
                                     'move_id':move_lines[0].id,
-                                 })   
-                pick_ids.append(picking_id) 
+                                 })
             else:
                 one_set_product_dict=self.get_set_product(move_lines and move_lines[0],product)
                 if not one_set_product_dict:
                     continue
                 transfer_product_qty={}
-                for bom_line,line_data in one_set_product_dict:                            
+                for bom_line,line_data in one_set_product_dict:                
                     qty=line_data['qty']
                     product_id=bom_line.product_id.id
-                    transfer_product_qty.update({product_id:qty})
+                    transfer_product_qty[product_id] = qty
                 for product_id,bom_qty in transfer_product_qty.items():
-                    file_qty = qty 
+                    file_qty = qty
                     if bom_qty<=0.0:
                         continue
                     if transfer_product_qty.get(product_id)<=0.0:
@@ -151,7 +149,7 @@ class stock_picking(models.Model):
                     qty_left=file_qty*bom_qty
                     product_move_lines=move_lines.filtered(lambda move_line: move_line.product_id.id == product_id)
                     for product_move_line in product_move_lines:  
-                        operations=product_move_line.move_line_ids.filtered(lambda o: o.qty_done <= 0 and not o.result_package_id)                              
+                        operations=product_move_line.move_line_ids.filtered(lambda o: o.qty_done <= 0 and not o.result_package_id)
                         move_line_remaning_qty=(product_move_line.product_uom_qty)-(sum(product_move_line.move_line_ids.mapped('qty_done')))
                         for operation in operations:
                             if operation.product_uom_qty<=qty_left:
@@ -163,7 +161,7 @@ class stock_picking(models.Model):
                             qty_left=float_round(qty_left -op_qty,precision_rounding=operation.product_uom_id.rounding,rounding_method='UP')
                             move_line_remaning_qty=move_line_remaning_qty-op_qty
                             if float(qty_left)<=0.0:
-                                transfer_product_qty.update({product_id:0.0})
+                                transfer_product_qty[product_id] = 0.0
                                 break
                         if float(qty_left)>0.0 and move_line_remaning_qty>0.0:
                             if move_line_remaning_qty<=float(qty_left):
@@ -182,7 +180,7 @@ class stock_picking(models.Model):
                                  })
                             qty_left=float_round(qty_left -op_qty,precision_rounding=product_move_line.product_id.uom_id.rounding,rounding_method='UP')
                             if float(qty_left)<=0.0:
-                                transfer_product_qty.update({product_id:0.0})
+                                transfer_product_qty[product_id] = 0.0
                                 break
                     if float(qty_left)>0.0 and float(op_qty):
                         stock_move_line_obj.create(
@@ -195,8 +193,8 @@ class stock_picking(models.Model):
                                     'location_id':picking_obj.location_id.id, 
                                     'location_dest_id':picking_obj.location_dest_id.id,
                                     'move_id':product_move_lines and product_move_lines[0].id,
-                             })   
-                pick_ids.append(picking_id)    
+                             })
+            pick_ids.append(picking_id)
         if pick_ids:
             pickings=self.search([('state','=','assigned'),('id','in',list(set(pick_ids)))])  
             pickings and pickings.action_done()
@@ -225,28 +223,27 @@ class stock_picking(models.Model):
             move_lines = move_obj.search([('picking_id','=',picking_id),
                                           ('product_id','=',product_id),
                                           ('state','in',('confirmed','assigned','partially_available'))])
-            is_kit_product=False            
+            is_kit_product=False
             """ If No Moves Lines Find out the Moves Lines Related to Picking Id and Product Id set in the sale order line.
              If move_lines that move_lines consider as kit_product moves.. """
-            
+
             if not move_lines:
                 move_lines = move_obj.search([('picking_id','=',picking_id),
                                               ('sale_line_id.product_id','=',product_id),
                                               ('state','in',('confirmed','assigned','partially_available'))])
                 is_kit_product=True
             """ If No one moves find..Forcefully create the moves if allow extra move=True """
-            if not move_lines:
-                if allow_extra_move == True:
-                    move=move_obj.create({       
-                                    'product_id':product_id,
-                                    'product_uom_qty':float(qty) or 0,
-                                    'picking_id':picking_id,
-                                    'name':product.name,
-                                    'location_id':picking_obj.location_id.id, 
-                                    'location_dest_id':picking_obj.location_dest_id.id,
-                                     })
-                    move._action_confirm()
-                    move._action_assign()
+            if not move_lines and allow_extra_move == True:
+                move=move_obj.create({       
+                                'product_id':product_id,
+                                'product_uom_qty':float(qty) or 0,
+                                'picking_id':picking_id,
+                                'name':product.name,
+                                'location_id':picking_obj.location_id.id, 
+                                'location_dest_id':picking_obj.location_dest_id.id,
+                                 })
+                move._action_confirm()
+                move._action_assign()
             """ If moves_lines and not Kit Product check the qty if qty less than zero break the tranc..
             if qty not less than zero calculate remaning qty of move line and find out the operation which is done qty less
             than or equal to zero.done qty of operation..then put the picking in to package. """
@@ -294,19 +291,18 @@ class stock_picking(models.Model):
                                     'location_id':picking_obj.location_id.id, 
                                     'location_dest_id':picking_obj.location_dest_id.id,
                                     'move_id':move_lines and move_lines[0].id,
-                                 })   
-                pick_ids.append(picking_id) 
+                                 })
             else:
                 one_set_product_dict=self.get_set_product(move_lines and move_lines[0],product)
                 if not one_set_product_dict:
                     continue
                 transfer_product_qty={}
-                for bom_line,line_data in one_set_product_dict:                            
+                for bom_line,line_data in one_set_product_dict:                
                     qty=line_data['qty']
                     product_id=bom_line.product_id.id
-                    transfer_product_qty.update({product_id:qty})
+                    transfer_product_qty[product_id] = qty
                 for product_id,bom_qty in transfer_product_qty.items():
-                    file_qty = qty 
+                    file_qty = qty
                     if bom_qty<=0.0:
                         continue
                     if transfer_product_qty.get(product_id)<=0.0:
@@ -314,7 +310,7 @@ class stock_picking(models.Model):
                     qty_left=file_qty*bom_qty
                     product_move_lines=move_lines.filtered(lambda move_line: move_line.product_id.id == product_id)
                     for product_move_line in product_move_lines:  
-                        operations=product_move_line.move_line_ids.filtered(lambda o: o.qty_done <= 0 and not o.result_package_id)                              
+                        operations=product_move_line.move_line_ids.filtered(lambda o: o.qty_done <= 0 and not o.result_package_id)
                         move_line_remaning_qty=(product_move_line.product_uom_qty)-(sum(product_move_line.move_line_ids.mapped('qty_done')))
                         for operation in operations:
                             if operation.product_uom_qty<=qty_left:
@@ -322,11 +318,11 @@ class stock_picking(models.Model):
                             else:
                                 op_qty=qty_left
                             operation.write({'qty_done':op_qty})
-                            self._put_in_pack_ept(operation,False)                            
+                            self._put_in_pack_ept(operation,False)
                             qty_left=float_round(qty_left -op_qty,precision_rounding=operation.product_uom_id.rounding,rounding_method='UP')
                             move_line_remaning_qty=move_line_remaning_qty-op_qty
                             if float(qty_left)<=0.0:
-                                transfer_product_qty.update({product_id:0.0})
+                                transfer_product_qty[product_id] = 0.0
                                 break
                         if float(qty_left)>0.0 and move_line_remaning_qty>0.0:
                             if move_line_remaning_qty<=float(qty_left):
@@ -344,7 +340,7 @@ class stock_picking(models.Model):
                                  })
                             qty_left=float_round(qty_left -op_qty,precision_rounding=product_move_line.product_id.uom_id.rounding,rounding_method='UP')
                             if float(qty_left)<=0.0:
-                                transfer_product_qty.update({product_id:0.0})
+                                transfer_product_qty[product_id] = 0.0
                                 break
                     if float(qty_left)>0.0:
                         stock_move_line_obj.create({       
@@ -355,8 +351,8 @@ class stock_picking(models.Model):
                             'location_id':picking_obj.location_id.id, 
                             'location_dest_id':picking_obj.location_dest_id.id,
                             'move_id':product_move_lines and product_move_lines[0].id,
-                             })   
-                pick_ids.append(picking_id)    
+                             })
+            pick_ids.append(picking_id)
         if pick_ids:
             pickings=self.search([('state','=','assigned'),('id','in',list(set(pick_ids)))])  
             pickings and pickings.action_done()
@@ -434,8 +430,7 @@ class stock_picking(models.Model):
                 'procure_method': 'make_to_stock',
                 'move_dest_id': False
             }
-        move = self.env['stock.move'].create(vals)
-        if move:
+        if move := self.env['stock.move'].create(vals):
             new_picking.action_confirm()
             new_picking.action_assign()
         if auto_validate:
@@ -481,7 +476,7 @@ class stock_picking(models.Model):
                 if move.sale_line_id  in phantom_product_dict and move.product_id.id not in phantom_product_dict.get(move.sale_line_id):
                     phantom_product_dict.get(move.sale_line_id).append(move.product_id.id)
                 else:
-                    phantom_product_dict.update({move.sale_line_id:[move.product_id.id]})
+                    phantom_product_dict[move.sale_line_id] = [move.product_id.id]
         for sale_line_id,product_ids in phantom_product_dict.items():
             moves=move_obj.search([('picking_id','=',picking_obj.id),('state','=','done'),('product_id','in',product_ids)])
             line_id = sale_line_id.search_read([("id","=",sale_line_id.id)],[order_line_field])[0].get(order_line_field)
@@ -490,7 +485,7 @@ class stock_picking(models.Model):
                 if not tracking_no:
                     for move_line in move.move_line_ids:
                         tracking_no=move_line.result_package_id and move_line.result_package_id.tracking_no or False
-            
+
             update_move_ids+=moves.ids
             product_qty= sale_line_id.product_qty or 0.0
             default_code = sale_line_id.product_id.default_code
@@ -500,23 +495,20 @@ class stock_picking(models.Model):
                         quantity=line.get('quantity')
                         product_qty=quantity+product_qty                                
                         line.update({'quantity':product_qty,'line_id':line_id,'tracking_no':tracking_no})
-                else:
-                    line_items.get(default_code).append({'quantity':product_qty,'line_id':line_id,'tracking_no':tracking_no})                                                         
             else:
-                line_items.update({default_code:[]})
-                line_items.get(default_code).append({'quantity':product_qty,'line_id':line_id,'tracking_no':tracking_no})
-            
+                line_items[default_code] = []
+            line_items.get(default_code).append({'quantity':product_qty,'line_id':line_id,'tracking_no':tracking_no})
         return line_items,update_move_ids
          
     @api.multi
     def get_tracking_numbers(self,picking,order_line_field=False):
         move_line_obj = self.env['stock.move.line']
-        line_items,update_move_ids = self.get_traking_number_for_phantom_type_product(picking,order_line_field)                
+        line_items,update_move_ids = self.get_traking_number_for_phantom_type_product(picking,order_line_field)
         stock_moves = self.env['stock.move'].search([('id','not in',update_move_ids),('picking_id','=',picking)])
         for move in stock_moves:
             line_id = move.sale_line_id.search_read([("id","=",move.sale_line_id.id)],[order_line_field])[0].get(order_line_field)
             move_line = move_line_obj.search([('move_id','=',move.id),('product_id','=',move.product_id.id)])
-            for move in move_line:        
+            for move in move_line:
                 if move.result_package_id:
                     tracking_no=False
                     if move.result_package_id.tracking_no:  
@@ -530,9 +522,7 @@ class stock_picking(models.Model):
                                 quantity=line.get('quantity')
                                 product_qty=quantity+product_qty                                
                                 line.update({'quantity':product_qty,'line_id':line_id,'tracking_no':tracking_no})
-                        else:
-                            line_items.get(default_code).append({'quantity':product_qty,'line_id':line_id,'tracking_no':tracking_no})                                                         
                     else:
                         line_items.update({default_code:[]})
-                        line_items.get(default_code).append({'quantity':product_qty,'line_id':line_id,'tracking_no':tracking_no})
+                    line_items.get(default_code).append({'quantity':product_qty,'line_id':line_id,'tracking_no':tracking_no})
         return line_items

@@ -10,7 +10,7 @@ class ProxiedTransport(xmlrpc_client.Transport):
         return http_client.HTTP(self.proxy)
 
     def send_request(self, connection, handler, request_body):
-        connection.putrequest("POST", "http://%s%s" % (self.host, handler))
+        connection.putrequest("POST", f"http://{self.host}{handler}")
 
     def send_host(self, connection, host):
         connection.putheader('Host', host)

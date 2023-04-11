@@ -16,9 +16,7 @@ def _init():
     """
     return ctypes.cdll.LoadLibrary(find_library('magic'))
 
-_libraries = {}
-_libraries['magic'] = _init()
-
+_libraries = {'magic': _init()}
 # Flag constants for open and setflags
 MAGIC_NONE = NONE = 0
 MAGIC_DEBUG = DEBUG = 1
@@ -119,10 +117,7 @@ class Magic(object):
         is set.  A call to errno() will return the numeric error code.
         """
         try:  # attempt python3 approach first
-            if isinstance(filename, bytes):
-                bi = filename
-            else:
-                bi = bytes(filename, 'utf-8')
+            bi = filename if isinstance(filename, bytes) else bytes(filename, 'utf-8')
             return str(_file(self._magic_t, bi), 'utf-8')
         except:
             return _file(self._magic_t, filename.encode('utf-8'))

@@ -27,32 +27,31 @@ class sale_order_line(models.Model):
         for line in self:
             if not line.order_id.invoice_policy:
                 return super(sale_order_line,self)._compute_invoice_status()
-            else:
-                if line.state not in ('sale', 'done'):
-                    line.invoice_status = 'no'
-                elif not float_is_zero(line.qty_to_invoice, precision_digits=precision):
-                    line.invoice_status = 'to invoice'
-                elif line.state == 'sale' and line.order_id.invoice_policy == 'order' and\
+            if line.state not in ('sale', 'done'):
+                line.invoice_status = 'no'
+            elif not float_is_zero(line.qty_to_invoice, precision_digits=precision):
+                line.invoice_status = 'to invoice'
+            elif line.state == 'sale' and line.order_id.invoice_policy == 'order' and\
                         float_compare(line.qty_delivered, line.product_uom_qty, precision_digits=precision) == 1:
-                    line.invoice_status = 'upselling'
-                elif float_compare(line.qty_invoiced, line.product_uom_qty, precision_digits=precision) >= 0:
-                    line.invoice_status = 'invoiced'
-                else:
-                    line.invoice_status = 'no'
-                """
+                line.invoice_status = 'upselling'
+            elif float_compare(line.qty_invoiced, line.product_uom_qty, precision_digits=precision) >= 0:
+                line.invoice_status = 'invoiced'
+            else:
+                line.invoice_status = 'no'
+            """
                     This is case of partially delivery and user will lock order manually 
                     Product Invoice policy is delivery
                     Order quantity 5
                     Deliver partially 3 and cancel back order
                     After create invoice if user will lock order then incoice status should be invoiced.                    
                 """
-                if line.order_id.state == 'done'\
+            if line.order_id.state == 'done'\
                         and line.invoice_status == 'no'\
                         and line.product_id.type in ['consu', 'product']\
                         and line.product_id.invoice_policy == 'delivery'\
                         and line.move_ids \
                         and all(move.state in ['done', 'cancel'] for move in line.move_ids):
-                    line.invoice_status = 'invoiced'
+                line.invoice_status = 'invoiced'
 
    
     @api.depends('qty_invoiced', 'qty_delivered', 'product_uom_qty', 'order_id.state')
@@ -64,14 +63,15 @@ class sale_order_line(models.Model):
         for line in self:
             if not line.order_id.invoice_policy:
                 return super(sale_order_line,self)._get_to_invoice_qty()
+            if line.order_id.state in ['sale', 'done']:
+                line.qty_to_invoice = (
+                    line.product_uom_qty - line.qty_invoiced
+                    if line.order_id.invoice_policy == 'order'
+                    or line.product_id.type == 'service'
+                    else line.qty_delivered - line.qty_invoiced
+                )
             else:
-                if line.order_id.state in ['sale', 'done']:
-                    if line.order_id.invoice_policy == 'order' or line.product_id.type=='service':
-                        line.qty_to_invoice = line.product_uom_qty - line.qty_invoiced
-                    else:
-                        line.qty_to_invoice = line.qty_delivered - line.qty_invoiced
-                else:
-                    line.qty_to_invoice = 0
+                line.qty_to_invoice = 0
                     
     producturl=fields.Text("Product URL")
     

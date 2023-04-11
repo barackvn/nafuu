@@ -13,10 +13,8 @@ class UnicodeDictReader(csv.DictReader):
         csv.DictReader.__init__(self, csvfile, *args, **kwargs)
 
     def __next__(self):
-        rv = csv.DictReader.__next__()(self)        
-        return dict((
-            (k, v.decode(self.encoding,'ignore') if v else v) for k, v in rv.items()
-        ))
+        rv = csv.DictReader.__next__()(self)
+        return {k: v.decode(self.encoding,'ignore') if v else v for k, v in rv.items()}
 
 
 class UnicodeDictWriter(csv.DictWriter):
@@ -77,27 +75,25 @@ class FTPInterface(object):
         :param file: An open file or a file like object
         """
         self.client.cwd(self.to_tpw_dir)
-        new_file=BytesIO(file.read().encode())       
-        self.client.storbinary('STOR %s' % filename, new_file)
+        new_file=BytesIO(file.read().encode())
+        self.client.storbinary(f'STOR {filename}', new_file)
 
     def pull_from_ftp(self, pattern, latest=False):
         self.client.cwd(self.from_tpw_dir)
-        matched_files=[]
-        for f in self.client.nlst():
-            if f.strip().startswith(pattern):
-                matched_files.append(f)
-
-        matched_files.sort()        
+        matched_files = [
+            f for f in self.client.nlst() if f.strip().startswith(pattern)
+        ]
+        matched_files.sort()
         files_to_export = []
-        
+
         for file_to_import in matched_files:
             file = NamedTemporaryFile(delete=False)
 
-            self.client.retrbinary('RETR %s' % file_to_import, file.write)
+            self.client.retrbinary(f'RETR {file_to_import}', file.write)
             file.close()
 
             files_to_export.append(file.name)
-        
+
         return (files_to_export, matched_files)
 
 
@@ -123,8 +119,8 @@ class FTPInterface(object):
     def archive_file(self,filenames):
         """ Archive the files. """
         for filename in filenames:
-            fromname = "%s%s" %(self.from_tpw_dir,filename)
-            toname = "%s%s" %(self.archive_dir,filename)
+            fromname = f"{self.from_tpw_dir}{filename}"
+            toname = f"{self.archive_dir}{filename}"
             self.client.cwd(self.from_tpw_dir)
             self.client.rename(fromname, toname)
         return True

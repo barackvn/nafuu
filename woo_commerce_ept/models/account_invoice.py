@@ -21,13 +21,16 @@ class account_invoice(models.Model):
                 lines=self.env['sale.order.line'].search([('invoice_lines.invoice_id','=',refund.source_invoice_id.id)])
                 order_ids=[line.order_id.id for line in lines]
                 orders=order_ids and self.env['sale.order'].browse(list(set(order_ids))) or []                
-                    
+
             for order in orders:
                 data = {'amount':str(refund.amount_total),'reason':str(refund.name or '')}
                 if refund.woo_instance_id.woo_version == 'old':
-                    response = wcapi.post('orders/%s/refunds'%(order.woo_order_id),{'order_refund':data})
+                    response = wcapi.post(
+                        f'orders/{order.woo_order_id}/refunds',
+                        {'order_refund': data},
+                    )
                 elif refund.woo_instance_id.woo_version == 'new':
-                    response = wcapi.post('orders/%s/refunds'%(order.woo_order_id),data)
+                    response = wcapi.post(f'orders/{order.woo_order_id}/refunds', data)
                 if not isinstance(response,requests.models.Response):
                     transaction_log_obj.create({'message':"Refund \n Response is not in proper format :: %s"%(response),
                                                  'mismatch_details':True,

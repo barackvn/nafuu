@@ -44,14 +44,18 @@ class WooCoupons(models.Model):
     def create(self, vals):
         if vals.get("product_ids"):
             for val in vals.get("product_ids")[0][2]:
-                if vals.get("exclude_product_ids"):
-                    if val in vals.get("exclude_product_ids")[0][2]: 
-                        raise Warning("Same Product will not allowed to select in both Products and Exclude Products")
+                if (
+                    vals.get("exclude_product_ids")
+                    and val in vals.get("exclude_product_ids")[0][2]
+                ):
+                    raise Warning("Same Product will not allowed to select in both Products and Exclude Products")
         if vals.get("product_category_ids"):
             for val in vals.get("product_category_ids")[0][2]:
-                if vals.get("excluded_product_category_ids"):
-                    if val in vals.get("excluded_product_category_ids")[0][2]: 
-                        raise Warning("Same Product Category will not allowed to select in both Products and Exclude Products")
+                if (
+                    vals.get("excluded_product_category_ids")
+                    and val in vals.get("excluded_product_category_ids")[0][2]
+                ):
+                    raise Warning("Same Product Category will not allowed to select in both Products and Exclude Products")
         return super(WooCoupons,self).create(vals)
    
     """using this method we checking that is their any same value in product and exclude product same for category"""
@@ -59,14 +63,18 @@ class WooCoupons(models.Model):
     def write(self,vals):
         if vals.get("product_ids"):
             for val in vals.get("product_ids")[0][2]:
-                if vals.get("exclude_product_ids"):
-                    if val in vals.get("exclude_product_ids")[0][2]: 
-                        raise Warning("Same Product will not allowed to select in both Products and Exclude Products")
+                if (
+                    vals.get("exclude_product_ids")
+                    and val in vals.get("exclude_product_ids")[0][2]
+                ):
+                    raise Warning("Same Product will not allowed to select in both Products and Exclude Products")
         if vals.get("product_category_ids"):
             for val in vals.get("product_category_ids")[0][2]:
-                if vals.get("excluded_product_category_ids"):
-                    if val in vals.get("excluded_product_category_ids")[0][2]: 
-                        raise Warning("Same Product Category will not allowed to select in both Products and Exclude Products")
+                if (
+                    vals.get("excluded_product_category_ids")
+                    and val in vals.get("excluded_product_category_ids")[0][2]
+                ):
+                    raise Warning("Same Product Category will not allowed to select in both Products and Exclude Products")
         return super(WooCoupons,self).write(vals)
    
     """this method is used to create coupon from Odoo to WooCommerce and store response data"""    
@@ -77,23 +85,22 @@ class WooCoupons(models.Model):
 
         for woo_coupon in woo_coupons:
             
-            woo_product_tmpl_ids=[]
-            woo_product_exclude_tmpl_ids=[]
-            woo_category_ids=[]
-            woo_exclude_category_ids=[]
-            
-            for product_tmpl_id in woo_coupon.product_ids:
-                woo_product_tmpl_ids.append(product_tmpl_id.woo_tmpl_id)
-            
-            for exclude_product_tmpl_id in woo_coupon.exclude_product_ids:
-                woo_product_exclude_tmpl_ids.append(exclude_product_tmpl_id.woo_tmpl_id)
-            
-            for categ_id in woo_coupon.product_category_ids:
-                woo_category_ids.append(categ_id.woo_categ_id)
-            
-            for exclude_categ_id in woo_coupon.excluded_product_category_ids:
-                woo_exclude_category_ids.append(exclude_categ_id.woo_categ_id)
-            
+            woo_product_tmpl_ids = [
+                product_tmpl_id.woo_tmpl_id
+                for product_tmpl_id in woo_coupon.product_ids
+            ]
+            woo_product_exclude_tmpl_ids = [
+                exclude_product_tmpl_id.woo_tmpl_id
+                for exclude_product_tmpl_id in woo_coupon.exclude_product_ids
+            ]
+            woo_category_ids = [
+                categ_id.woo_categ_id
+                for categ_id in woo_coupon.product_category_ids
+            ]
+            woo_exclude_category_ids = [
+                exclude_categ_id.woo_categ_id
+                for exclude_categ_id in woo_coupon.excluded_product_category_ids
+            ]
             free_shipping="free_shipping"
             prodcut_category = "product_categories"
             exclude_prodcut_category = "excluded_product_categories"
@@ -105,36 +112,41 @@ class WooCoupons(models.Model):
                 exclude_prodcut_category = "exclude_product_category_ids"
                 email_restriction = "customer_emails"
                 discount_type = "type"
-            
+
             email_ids = []
             if woo_coupon.email_restrictions:
                 email_ids = woo_coupon.email_restrictions.split(",")
-            
-            row_data = {'code': woo_coupon.code,
-                        'description':str(woo_coupon.description or '') or '',
-                        discount_type: woo_coupon.discount_type,
-                        free_shipping:woo_coupon.free_shipping,
-                        'amount': str(woo_coupon.amount),
-                        'expiry_date'if not instance.is_latest else 'date_expires':"{}".format(woo_coupon.expiry_date or ''),
-                        'minimum_amount':str(woo_coupon.minimum_amount),
-                        'maximum_amount':str(woo_coupon.maximum_amount),
-                        'individual_use':woo_coupon.individual_use,
-                        'exclude_sale_items':woo_coupon.exclude_sale_items,
-                        'product_ids':woo_product_tmpl_ids,
-                        'exclude_product_ids'if not instance.is_latest else 'excluded_product_ids':woo_product_exclude_tmpl_ids,
-                        prodcut_category:woo_category_ids,
-                        exclude_prodcut_category:woo_exclude_category_ids,
-                        email_restriction:email_ids,
-                        'usage_limit':woo_coupon.usage_limit,
-                        'limit_usage_to_x_items':woo_coupon.limit_usage_to_x_items,
-                        'usage_limit_per_user':woo_coupon.usage_limit_per_user,
-                        }
-           
-            if instance.woo_version == 'old':
-                data = {'coupon':row_data}
-            elif instance.woo_version == 'new':
+
+            row_data = {
+                'code': woo_coupon.code,
+                'description': str(woo_coupon.description or '') or '',
+                discount_type: woo_coupon.discount_type,
+                free_shipping: woo_coupon.free_shipping,
+                'amount': str(woo_coupon.amount),
+                'date_expires'
+                if instance.is_latest
+                else 'expiry_date': f"{woo_coupon.expiry_date or ''}",
+                'minimum_amount': str(woo_coupon.minimum_amount),
+                'maximum_amount': str(woo_coupon.maximum_amount),
+                'individual_use': woo_coupon.individual_use,
+                'exclude_sale_items': woo_coupon.exclude_sale_items,
+                'product_ids': woo_product_tmpl_ids,
+                'excluded_product_ids'
+                if instance.is_latest
+                else 'exclude_product_ids': woo_product_exclude_tmpl_ids,
+                prodcut_category: woo_category_ids,
+                exclude_prodcut_category: woo_exclude_category_ids,
+                email_restriction: email_ids,
+                'usage_limit': woo_coupon.usage_limit,
+                'limit_usage_to_x_items': woo_coupon.limit_usage_to_x_items,
+                'usage_limit_per_user': woo_coupon.usage_limit_per_user,
+            }
+
+            if instance.woo_version == 'new':
                 data = row_data
-            
+
+            elif instance.woo_version == 'old':
+                data = {'coupon':row_data}
             res = wcapi.post("coupons", data)
             if not isinstance(res,requests.models.Response):                
                 transaction_log_obj.create({'message':"Export Coupons \nResponse is not in proper format :: %s"%(res),
@@ -144,14 +156,15 @@ class WooCoupons(models.Model):
                                             })
                 continue
             if res.status_code not in [200,201]:
-                message = res.content           
-                if message:
+                if message := res.content:
                     transaction_log_obj.create(
-                                                {'message':"Can not Export Coupons, %s"%(message),
-                                                 'mismatch_details':True,
-                                                 'type':'coupon',
-                                                 'woo_instance_id':instance.id
-                                                })
+                        {
+                            'message': f"Can not Export Coupons, {message}",
+                            'mismatch_details': True,
+                            'type': 'coupon',
+                            'woo_instance_id': instance.id,
+                        }
+                    )
                     continue
                 if instance.woo_version == 'old':
                     try:
@@ -162,18 +175,19 @@ class WooCoupons(models.Model):
                                      'type':'coupon',
                                      'woo_instance_id':instance.id
                                     })
-                        continue            
-                    errors = response.get('errors','')
-                    if errors:
+                        continue
+                    if errors := response.get('errors', ''):
                         message = errors[0].get('message')
                         transaction_log_obj.create(
-                                                    {'message':"Can not Export Coupons,  %s"%(message),
-                                                     'mismatch_details':True,
-                                                     'type':'coupon',
-                                                     'woo_instance_id':instance.id
-                                                    })
+                            {
+                                'message': f"Can not Export Coupons,  {message}",
+                                'mismatch_details': True,
+                                'type': 'coupon',
+                                'woo_instance_id': instance.id,
+                            }
+                        )
                         continue
-                                
+
             if instance.woo_version == 'new':
                 try:
                     response = res.json()
@@ -185,7 +199,7 @@ class WooCoupons(models.Model):
                                 })
                     continue
                 woo_coupon.write({"coupon_id":response.get("id"),"used_by":response.get("used_by"),"date_created":response.get("date_created"),"date_modified":response.get("date_modified"),"exported_in_woo":True})
-        
+
             if instance.woo_version == 'old':
                 try:
                     response = res.json().get("coupon")
@@ -197,7 +211,7 @@ class WooCoupons(models.Model):
                                 })
                     continue
                 woo_coupon.write({"coupon_id":response.get("id"),"date_created":response.get("created_at"),"date_modified":response.get("updated_at"),"exported_in_woo":True})
-               
+
         return True
     
     """this method is used to create coupon from Odoo to WooCommerce and store response data"""    
@@ -209,24 +223,23 @@ class WooCoupons(models.Model):
         for woo_coupon in woo_coupons:
             if woo_coupon.coupon_id == 0 and not woo_coupon.exported_in_woo:    
                 raise Warning("Coupon is not having coupon id or not exported in WooCommerce")
-            
-            woo_product_tmpl_ids=[]
-            woo_product_exclude_tmpl_ids=[]
-            woo_category_ids=[]
-            woo_exclude_category_ids=[]
-            
-            for product_tmpl_id in woo_coupon.product_ids:
-                woo_product_tmpl_ids.append(product_tmpl_id.woo_tmpl_id)
-            
-            for exclude_product_tmpl_id in woo_coupon.exclude_product_ids:
-                woo_product_exclude_tmpl_ids.append(exclude_product_tmpl_id.woo_tmpl_id)
-            
-            for categ_id in woo_coupon.product_category_ids:
-                woo_category_ids.append(categ_id.woo_categ_id)
-            
-            for exclude_categ_id in woo_coupon.excluded_product_category_ids:
-                woo_exclude_category_ids.append(exclude_categ_id.woo_categ_id)
-            
+
+            woo_product_tmpl_ids = [
+                product_tmpl_id.woo_tmpl_id
+                for product_tmpl_id in woo_coupon.product_ids
+            ]
+            woo_product_exclude_tmpl_ids = [
+                exclude_product_tmpl_id.woo_tmpl_id
+                for exclude_product_tmpl_id in woo_coupon.exclude_product_ids
+            ]
+            woo_category_ids = [
+                categ_id.woo_categ_id
+                for categ_id in woo_coupon.product_category_ids
+            ]
+            woo_exclude_category_ids = [
+                exclude_categ_id.woo_categ_id
+                for exclude_categ_id in woo_coupon.excluded_product_category_ids
+            ]
             free_shipping="free_shipping"
             prodcut_category = "product_categories"
             exclude_prodcut_category = "excluded_product_categories"
@@ -238,38 +251,43 @@ class WooCoupons(models.Model):
                 exclude_prodcut_category = "exclude_product_category_ids"
                 email_restriction = "customer_emails"
                 discount_type = "type"
-            
+
             email_ids = []
             if woo_coupon.email_restrictions:
                 email_ids = woo_coupon.email_restrictions.split(",")
-            
-            row_data = {'code': woo_coupon.code,
-                        'description':str(woo_coupon.description or '') or '',
-                        discount_type: woo_coupon.discount_type,
-                        free_shipping:woo_coupon.free_shipping,
-                        'amount': str(woo_coupon.amount),
-                        'expiry_date'if not instance.is_latest else 'date_expires':"{}".format(woo_coupon.expiry_date or ''),
-                        'minimum_amount':str(woo_coupon.minimum_amount),
-                        'maximum_amount':str(woo_coupon.maximum_amount),
-                        'individual_use':woo_coupon.individual_use,
-                        'exclude_sale_items':woo_coupon.exclude_sale_items,
-                        'product_ids':woo_product_tmpl_ids,
-                        'exclude_product_ids'if not instance.is_latest else 'excluded_product_ids':woo_product_exclude_tmpl_ids,
-                        prodcut_category:woo_category_ids,
-                        exclude_prodcut_category:woo_exclude_category_ids,
-                        email_restriction:email_ids,
-                        'usage_limit':woo_coupon.usage_limit,
-                        'limit_usage_to_x_items':woo_coupon.limit_usage_to_x_items,
-                        'usage_limit_per_user':woo_coupon.usage_limit_per_user,
-                        }
-         
+
+            row_data = {
+                'code': woo_coupon.code,
+                'description': str(woo_coupon.description or '') or '',
+                discount_type: woo_coupon.discount_type,
+                free_shipping: woo_coupon.free_shipping,
+                'amount': str(woo_coupon.amount),
+                'date_expires'
+                if instance.is_latest
+                else 'expiry_date': f"{woo_coupon.expiry_date or ''}",
+                'minimum_amount': str(woo_coupon.minimum_amount),
+                'maximum_amount': str(woo_coupon.maximum_amount),
+                'individual_use': woo_coupon.individual_use,
+                'exclude_sale_items': woo_coupon.exclude_sale_items,
+                'product_ids': woo_product_tmpl_ids,
+                'excluded_product_ids'
+                if instance.is_latest
+                else 'exclude_product_ids': woo_product_exclude_tmpl_ids,
+                prodcut_category: woo_category_ids,
+                exclude_prodcut_category: woo_exclude_category_ids,
+                email_restriction: email_ids,
+                'usage_limit': woo_coupon.usage_limit,
+                'limit_usage_to_x_items': woo_coupon.limit_usage_to_x_items,
+                'usage_limit_per_user': woo_coupon.usage_limit_per_user,
+            }
+
             if instance.woo_version == 'old':
                 data = {'coupon':row_data}
-                res = wcapi.put("coupons/"+str(woo_coupon.coupon_id),data)
+                res = wcapi.put(f"coupons/{str(woo_coupon.coupon_id)}", data)
             elif instance.woo_version == 'new':
-                row_data.update({'id':woo_coupon.coupon_id})
+                row_data['id'] = woo_coupon.coupon_id
                 res = wcapi.post("coupons/batch",{'update':[row_data]})
-                
+
             if not isinstance(res,requests.models.Response):                
                 transaction_log_obj.create({'message':"Export Coupons \nResponse is not in proper format :: %s"%(res),
                                              'mismatch_details':True,
@@ -300,18 +318,19 @@ class WooCoupons(models.Model):
                                      'type':'coupon',
                                      'woo_instance_id':instance.id
                                     })
-                        continue            
-                    errors = response.get('errors')
-                    if errors:
+                        continue
+                    if errors := response.get('errors'):
                         message = errors[0].get('message')
                         transaction_log_obj.create(
-                                                    {'message':"Can not Export Coupons,  %s"%(message),
-                                                     'mismatch_details':True,
-                                                     'type':'coupon',
-                                                     'woo_instance_id':instance.id
-                                                    })
+                            {
+                                'message': f"Can not Export Coupons,  {message}",
+                                'mismatch_details': True,
+                                'type': 'coupon',
+                                'woo_instance_id': instance.id,
+                            }
+                        )
                         continue
-                else:                                            
+                else:                                
                     message = res.content
                     try:
                         response = res.json()
@@ -322,9 +341,12 @@ class WooCoupons(models.Model):
                                      'woo_instance_id':instance.id
                                     })
                         continue
-                    if instance.woo_version == 'new':
-                        if res.json().get("code") == "woocommerce_rest_shop_coupon_invalid_id":
-                            message = "Coupon ID %s is Invalid or Not exists in WooCommerce"%woo_coupon.coupon_id           
+                    if (
+                        instance.woo_version == 'new'
+                        and res.json().get("code")
+                        == "woocommerce_rest_shop_coupon_invalid_id"
+                    ):
+                        message = f"Coupon ID {woo_coupon.coupon_id} is Invalid or Not exists in WooCommerce"
                     transaction_log_obj.create(
                                                 {'message':message,
                                                  'mismatch_details':True,
@@ -332,7 +354,7 @@ class WooCoupons(models.Model):
                                                  'woo_instance_id':instance.id
                                                 })
                     continue   
-                    
+
             if instance.woo_version == 'new':
                 try:
                     response = res.json()
@@ -344,7 +366,7 @@ class WooCoupons(models.Model):
                                 })
                     continue
                 woo_coupon.write({"coupon_id":response.get("id"),"used_by":response.get("used_by"),"date_created":response.get("date_created"),"date_modified":response.get("date_modified"),"exported_in_woo":True})
-        
+
             if instance.woo_version == 'old':
                 try:
                     response = res.json().get("coupon")
@@ -436,9 +458,9 @@ class WooCoupons(models.Model):
     
     def import_all_woo_coupons(self,wcapi,instance,transaction_log_obj,page):
         if instance.woo_version == 'new':
-            res = wcapi.get('coupons?per_page=100&page=%s'%(page))        
+            res = wcapi.get(f'coupons?per_page=100&page={page}')
         else:
-            res = wcapi.get('coupons?filter[limit]=1000&page=%s'%(page))
+            res = wcapi.get(f'coupons?filter[limit]=1000&page={page}')
         if not isinstance(res,requests.models.Response):               
             transaction_log_obj.create({'message': "Import All Coupons \nResponse is not in proper format :: %s"%(res),
                                          'mismatch_details':True,
@@ -447,7 +469,7 @@ class WooCoupons(models.Model):
                                         })
             return []
         if res.status_code not in [200,201]:
-            message = "Error in Import All Coupons %s"%(res.content)                        
+            message = f"Error in Import All Coupons {res.content}"
             transaction_log_obj.create(
                                 {'message':message,
                                  'mismatch_details':True,
@@ -465,8 +487,7 @@ class WooCoupons(models.Model):
                         })
             return []
         if instance.woo_version == 'old':
-            errors = response.get('errors','')
-            if errors:
+            if errors := response.get('errors', ''):
                 message = errors[0].get('message')
                 transaction_log_obj.create(
                                             {'message':message,
@@ -484,18 +505,18 @@ class WooCoupons(models.Model):
         transaction_log_obj=self.env["woo.transaction.log"]
         wcapi = instance.connect_in_woo()
         coupon_ids=[]
+        if instance.woo_version == 'old':
+            res = wcapi.get("coupons?filter[limit]=-1")
+        else:
+            res = wcapi.get("coupons?per_page=100")
+        if not isinstance(res,requests.models.Response):                
+            transaction_log_obj.create({'message':"Get Coupons \nResponse is not in proper format :: %s"%(res),
+                                             'mismatch_details':True,
+                                             'type':'coupon',
+                                             'woo_instance_id':instance.id
+                                            })
+            return True
         if woo_coupons and woo_coupons.exported_in_woo:
-            if instance.woo_version == 'old':
-                res = wcapi.get("coupons?filter[limit]=-1")
-            else:
-                res = wcapi.get("coupons?per_page=100")
-            if not isinstance(res,requests.models.Response):                
-                transaction_log_obj.create({'message':"Get Coupons \nResponse is not in proper format :: %s"%(res),
-                                                 'mismatch_details':True,
-                                                 'type':'coupon',
-                                                 'woo_instance_id':instance.id
-                                                })
-                return True
             if res.status_code == 404:
                 self.export_coupons(instance, [woo_coupons])
                 return True
@@ -516,57 +537,20 @@ class WooCoupons(models.Model):
                                  'type':'coupon',
                                  'woo_instance_id':instance.id
                                 })
-                    return False            
-                errors = response.get('errors','')
-                if errors:
+                    return False
+                if errors := response.get('errors', ''):
                     message = errors[0].get('message')
                     transaction_log_obj.create(
-                                                {'message':"Can not Export Coupons,  %s"%(message),
-                                                 'mismatch_details':True,
-                                                 'type':'coupon',
-                                                 'woo_instance_id':instance.id
-                                                })
+                        {
+                            'message': f"Can not Export Coupons,  {message}",
+                            'mismatch_details': True,
+                            'type': 'coupon',
+                            'woo_instance_id': instance.id,
+                        }
+                    )
                     return True
-            
-            if instance.woo_version == 'old':
-                try:
-                    coupon_ids = res.json().get("coupons")
-                except Exception as e:
-                    transaction_log_obj.create({'message':"Json Error : While import coupons from WooCommerce for instance %s. \n%s"%(instance.name,e),
-                                 'mismatch_details':True,
-                                 'type':'coupon',
-                                 'woo_instance_id':instance.id
-                                })
-                    return False
-            else:
-                try:
-                    coupon_response = res.json()
-                except Exception as e:
-                    transaction_log_obj.create({'message':"Json Error : While import coupons from WooCommerce for instance %s. \n%s"%(instance.name,e),
-                                 'mismatch_details':True,
-                                 'type':'coupon',
-                                 'woo_instance_id':instance.id
-                                })
-                    return False
-                coupon_ids = coupon_ids + coupon_response
-                total_pages = res.headers.get('x-wp-totalpages',0)
-                if int(total_pages) >=2:
-                    for page in range(2,int(total_pages)+1):            
-                        coupon_ids = coupon_ids + self.import_all_woo_coupons(wcapi,instance,transaction_log_obj,page)
-            
-            self.create_or_write_coupon(instance, coupon_ids)
+
         else:
-            if instance.woo_version == 'old':
-                res = wcapi.get("coupons?filter[limit]=-1")
-            else:
-                res = wcapi.get("coupons?per_page=100")
-            if not isinstance(res,requests.models.Response):                
-                transaction_log_obj.create({'message':"Get Coupons \nResponse is not in proper format :: %s"%(res),
-                                             'mismatch_details':True,
-                                             'type':'coupon',
-                                             'woo_instance_id':instance.id
-                                                })
-                return True                
             if res.status_code not in [200,201]:
                 transaction_log_obj.create(
                                     {'message':res.content,
@@ -574,7 +558,7 @@ class WooCoupons(models.Model):
                                      'type':'coupon',
                                      'woo_instance_id':instance.id
                                     })
-                return True 
+                return True
             if instance.woo_version == 'old':
                 try:
                     response = res.json()
@@ -584,43 +568,45 @@ class WooCoupons(models.Model):
                                  'type':'coupon',
                                  'woo_instance_id':instance.id
                                 })
-                    return False            
-                errors = response.get('errors')
-                if errors:
+                    return False
+                if errors := response.get('errors'):
                     message = errors[0].get('message')
                     transaction_log_obj.create(
-                                                {'message':"Can not Export Coupons,  %s"%(message),
-                                                 'mismatch_details':True,
-                                                 'type':'coupon',
-                                                 'woo_instance_id':instance.id
-                                                })
+                        {
+                            'message': f"Can not Export Coupons,  {message}",
+                            'mismatch_details': True,
+                            'type': 'coupon',
+                            'woo_instance_id': instance.id,
+                        }
+                    )
                     return True 
-            
+
             coupon_response = ""
-            if instance.woo_version == 'old':
-                try:
-                    coupon_ids = res.json().get("coupons")
-                except Exception as e:
-                    transaction_log_obj.create({'message':"Json Error : While import coupons from WooCommerce for instance %s. \n%s"%(instance.name,e),
-                                 'mismatch_details':True,
-                                 'type':'coupon',
-                                 'woo_instance_id':instance.id
-                                })
-                    return False
-            else:
-                try:
-                    coupon_response=res.json()
-                except Exception as e:
-                    transaction_log_obj.create({'message':"Json Error : While import coupons from WooCommerce for instance %s. \n%s"%(instance.name,e),
-                                 'mismatch_details':True,
-                                 'type':'coupon',
-                                 'woo_instance_id':instance.id
-                                })
-                    return False
-                coupon_ids = coupon_ids + coupon_response
-                total_pages = res.headers.get('x-wp-totalpages',0)
-                if int(total_pages) >=2:
-                    for page in range(2,int(total_pages)+1):            
-                        coupon_ids = coupon_ids + self.import_all_woo_coupons(wcapi,instance,transaction_log_obj,page)         
-            self.create_or_write_coupon(instance, coupon_ids)
+        if instance.woo_version == 'old':
+            try:
+                coupon_ids = res.json().get("coupons")
+            except Exception as e:
+                transaction_log_obj.create({'message':"Json Error : While import coupons from WooCommerce for instance %s. \n%s"%(instance.name,e),
+                             'mismatch_details':True,
+                             'type':'coupon',
+                             'woo_instance_id':instance.id
+                            })
+                return False
+        else:
+            try:
+                coupon_response = res.json()
+            except Exception as e:
+                transaction_log_obj.create({'message':"Json Error : While import coupons from WooCommerce for instance %s. \n%s"%(instance.name,e),
+                             'mismatch_details':True,
+                             'type':'coupon',
+                             'woo_instance_id':instance.id
+                            })
+                return False
+            coupon_ids = coupon_ids + coupon_response
+            total_pages = res.headers.get('x-wp-totalpages',0)
+            if int(total_pages) >=2:
+                for page in range(2,int(total_pages)+1):            
+                    coupon_ids = coupon_ids + self.import_all_woo_coupons(wcapi,instance,transaction_log_obj,page)
+
+        self.create_or_write_coupon(instance, coupon_ids)
         return True

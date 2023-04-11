@@ -11,15 +11,24 @@ class account_invoice(models.Model):
         refund_invoice = invoice_obj.refund(date_posted,date_posted,invoice_obj.name,journal_id)
         refund_invoice.compute_taxes()
         refund_invoice.write({'date_invoice':date_posted,'origin':invoice_obj.name})
-        extra_invoice_lines = obj_invoice_line.search([('invoice_id','=',refund_invoice.id),('product_id','not in',product_ids)])
-        if extra_invoice_lines:
+        if extra_invoice_lines := obj_invoice_line.search(
+            [
+                ('invoice_id', '=', refund_invoice.id),
+                ('product_id', 'not in', product_ids),
+            ]
+        ):
             extra_invoice_lines.unlink()
         invoice_lines = obj_invoice_line.search([('invoice_id','=',refund_invoice.id),('product_id','=',datas.get('product_id'))])
-        exact_line=False
         if len(invoice_lines.ids)>1: 
-            exact_line=obj_invoice_line.search([('invoice_id','=',refund_invoice.id),('product_id','=',datas.get('product_id'))],limit=1)
-            if exact_line:
-                other_lines=obj_invoice_line.search([('invoice_id','=',refund_invoice.id),('product_id','=',datas.get('product_id')),('id','!=',exact_line.id)])  
+            exact_line=False
+            if exact_line := obj_invoice_line.search(
+                [
+                    ('invoice_id', '=', refund_invoice.id),
+                    ('product_id', '=', datas.get('product_id')),
+                ],
+                limit=1,
+            ):
+                other_lines=obj_invoice_line.search([('invoice_id','=',refund_invoice.id),('product_id','=',datas.get('product_id')),('id','!=',exact_line.id)])
                 other_lines.unlink()
                 exact_line.write({'quantity':datas.get('qty'),'price_unit':datas.get('amount')})
         else:
@@ -30,19 +39,17 @@ class account_invoice(models.Model):
     @api.multi
     def create_account_invoice_ept(self,vals):
         partner_obj = self.env['res.partner'].browse(vals.get('partner_id'))
-        invoice_vals = {
+        return {
             'type': vals.get('type'),
             'reference': vals.get('ref'),
             'account_id': partner_obj.property_account_receivable_id.id,
             'partner_id': partner_obj.id,
-            'journal_id': vals.get('journal_id',''),
-            'fiscal_position_id': vals.get('fiscal_position_id',''),
-            'company_id':vals.get('company_id',''),
+            'journal_id': vals.get('journal_id', ''),
+            'fiscal_position_id': vals.get('fiscal_position_id', ''),
+            'company_id': vals.get('company_id', ''),
             'user_id': self._uid or False,
-            'date_invoice':vals.get('date_invoice')
+            'date_invoice': vals.get('date_invoice'),
         }
-    
-        return invoice_vals
     
     @api.multi
     def create_account_invoice_line_ept(self,vals):

@@ -62,30 +62,33 @@ class mrpworkorder_inherit(models.Model):
 			})
 			po_id = False
 			purchase_obj = self.env['purchase.order'].search([('mrp_id','=',self.production_id.id)])
-			if purchase_obj.id == False:
-				if self.production_id.subcontract_bom:
-					if self.production_id.bom_id.supplier_id.id:
-						po_id = purchase_obj.create({
-								'partner_id': self.production_id.bom_id.supplier_id.id,
-								'date_planned' : datetime.today(),
-								'po_created':True,
-								'btn_shw':True,
-								'mrp_id' : self.production_id.id,
-								'origin' : self.production_id.name
-							})
-					if po_id.id:
-						for line in self.production_id.service_ids:
-							self.env['purchase.order.line'].create({
-									'product_id' : line.product_id.id,
-									'service':line.product_id.id,
-									'final_product' : self.product_id.id,
-									'name' : line.product_id.name,
-									'date_planned' : datetime.today(),
-									'product_uom' : line.product_id.uom_id.id,
-									'price_unit' : line.product_id.standard_price,
-									'product_qty' : self.production_id.product_qty,
-									'order_id' : po_id.id
-								})
+			if purchase_obj.id == False and self.production_id.subcontract_bom:
+				if self.production_id.bom_id.supplier_id.id:
+					po_id = purchase_obj.create(
+						{
+							'partner_id': self.production_id.bom_id.supplier_id.id,
+							'date_planned': datetime.now(),
+							'po_created': True,
+							'btn_shw': True,
+							'mrp_id': self.production_id.id,
+							'origin': self.production_id.name,
+						}
+					)
+				if po_id.id:
+					for line in self.production_id.service_ids:
+						self.env['purchase.order.line'].create(
+							{
+								'product_id': line.product_id.id,
+								'service': line.product_id.id,
+								'final_product': self.product_id.id,
+								'name': line.product_id.name,
+								'date_planned': datetime.now(),
+								'product_uom': line.product_id.uom_id.id,
+								'price_unit': line.product_id.standard_price,
+								'product_qty': self.production_id.product_qty,
+								'order_id': po_id.id,
+							}
+						)
 		return self.write({'state': 'progress',
 					'date_start': datetime.now(),
 		})

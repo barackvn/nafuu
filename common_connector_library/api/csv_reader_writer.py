@@ -51,6 +51,6 @@ class csv_reader_ept():
                     firstline = False
                 else:
                     values = "".join(line.split()).split(',')
-                    list_record.append({mykeys[n]:values[n] for n in range(0,len(mykeys))})
+                    list_record.append({mykeys[n]: values[n] for n in range(len(mykeys))})
         return list_record
     

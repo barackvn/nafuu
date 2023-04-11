@@ -43,7 +43,8 @@ class sale_report(models.Model):
     _order = 'date desc'
 
     def _select(self):
-        select_str = """
+        return (
+            """
             WITH currency_rate as (%s)
              SELECT min(l.id) as id,
                     l.product_id as product_id,
@@ -70,11 +71,12 @@ class sale_report(models.Model):
                     partner.country_id as country_id,
                     partner.commercial_partner_id as commercial_partner_id,
                     aie.id as woo_instance_id
-        """ % self.env['res.currency']._select_companies_rates()
-        return select_str
+        """
+            % self.env['res.currency']._select_companies_rates()
+        )
   
     def _from(self):
-        from_str = """
+        return """
                 sale_order_line l
                       join sale_order s on (l.order_id=s.id)
                       join woo_instance_ept aie on (aie.id=s.woo_instance_id)
@@ -89,10 +91,9 @@ class sale_report(models.Model):
                         cr.date_start <= coalesce(s.date_order, now()) and
                         (cr.date_end is null or cr.date_end > coalesce(s.date_order, now())))
         """
-        return from_str
   
     def _group_by(self):
-        group_by_str = """
+        return """
             GROUP BY l.product_id,
                     l.order_id,
                     t.uom_id,
@@ -111,7 +112,6 @@ class sale_report(models.Model):
                     partner.commercial_partner_id,
                     aie.id
         """
-        return group_by_str
     
     @api.model_cr
     def init(self):

@@ -144,11 +144,11 @@ def from_buffer(buffer, mime=False):
 
 
 libmagic = None
-# Let's try to find magic or magic1
-dll = ctypes.util.find_library('magic') or ctypes.util.find_library('magic1') or ctypes.util.find_library('cygmagic-1')
-
-# This is necessary because find_library returns None if it doesn't find the library
-if dll:
+if (
+    dll := ctypes.util.find_library('magic')
+    or ctypes.util.find_library('magic1')
+    or ctypes.util.find_library('cygmagic-1')
+):
     libmagic = ctypes.CDLL(dll)
 
 if not libmagic or not libmagic._name:
@@ -173,18 +173,16 @@ if not libmagic or not libmagic._name:
 magic_t = ctypes.c_void_p
 
 def errorcheck_null(result, func, args):
-    if result is None:
-        err = magic_error(args[0])
-        raise MagicException(err)
-    else:
+    if result is not None:
         return result
+    err = magic_error(args[0])
+    raise MagicException(err)
 
 def errorcheck_negative_one(result, func, args):
-    if result is -1:
-        err = magic_error(args[0])
-        raise MagicException(err)
-    else:
+    if result is not -1:
         return result
+    err = magic_error(args[0])
+    raise MagicException(err)
 
 
 def coerce_filename(filename):
@@ -199,10 +197,7 @@ def coerce_filename(filename):
                   isinstance(filename, unicode)) or \
                   (sys.version_info[0] >= 3 and
                    isinstance(filename, str))
-    if is_unicode:
-        return filename.encode('utf-8')
-    else:
-        return filename
+    return filename.encode('utf-8') if is_unicode else filename
 
 magic_open = libmagic.magic_open
 magic_open.restype = magic_t

@@ -21,20 +21,21 @@ class PurchaseOrder_inherit(models.Model):
 
 	@api.multi
 	def wo_close(self):
-		if self.state == 'purchase':
-			if self.mrp_id.workorder_ids:
-				rcd_pro = self.env['mrp.workorder'].browse(self.mrp_id.workorder_ids.id).record_production()
-				if rcd_pro:
-					mo_done = self.env['mrp.production'].browse(self.mrp_id.id).button_mark_done()
-				if mo_done:
-					if self.order_line:
-						if self.mrp_id.state == 'done':
-							self.order_line[0].qty_received = self.mrp_id.finished_move_line_ids[0].qty_done
-
-					self.btn_shw = False
-					# self.btn_hide = False
-		else:
+		if self.state != 'purchase':
 			raise UserError(_('Please confirm the Purchase Quotation.'))
+		if self.mrp_id.workorder_ids:
+			if (
+				rcd_pro := self.env['mrp.workorder']
+				.browse(self.mrp_id.workorder_ids.id)
+				.record_production()
+			):
+				mo_done = self.env['mrp.production'].browse(self.mrp_id.id).button_mark_done()
+			if mo_done:
+				if self.order_line and self.mrp_id.state == 'done':
+					self.order_line[0].qty_received = self.mrp_id.finished_move_line_ids[0].qty_done
+
+				self.btn_shw = False
+							# self.btn_hide = False
 
 	@api.multi
 	def wo_success(self):

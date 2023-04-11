@@ -10,9 +10,9 @@ class res_partner(models.Model):
     
     def import_all_woo_coustomers(self,wcapi,instance,transaction_log_obj,page):
         if instance.woo_version == 'new':
-            res = wcapi.get('customers?per_page=100&page=%s'%(page))        
+            res = wcapi.get(f'customers?per_page=100&page={page}')
         else:
-            res = wcapi.get('customers?filter[limit]=100&page=%s'%(page))
+            res = wcapi.get(f'customers?filter[limit]=100&page={page}')
         if not isinstance(res,requests.models.Response):               
             transaction_log_obj.create({'message': "Import All Customers \nResponse is not in proper format :: %s"%(res),
                                          'mismatch_details':True,
@@ -21,7 +21,7 @@ class res_partner(models.Model):
                                         })
             return []
         if res.status_code not in [200,201]:
-            message = "Error in Import All Customers %s"%(res.content)                        
+            message = f"Error in Import All Customers {res.content}"
             transaction_log_obj.create(
                                 {'message':message,
                                  'mismatch_details':True,
@@ -39,8 +39,7 @@ class res_partner(models.Model):
                                         })
             return False
         if instance.woo_version == 'old':
-            errors = response.get('errors','')
-            if errors:
+            if errors := response.get('errors', ''):
                 message = errors[0].get('message')
                 transaction_log_obj.create(
                                             {'message':message,
@@ -55,12 +54,11 @@ class res_partner(models.Model):
        
     @api.model
     def import_woo_customers(self,instance=False):        
-        instances=[]
         transaction_log_obj=self.env["woo.transaction.log"]
-        instances.append(instance)
+        instances = [instance]
         sale_order_obj=self.env['sale.order']
-        
-        for instance in instances:            
+
+        for instance in instances:        
             wcapi = instance.connect_in_woo()
             if instance.woo_version == 'new':
                 response = wcapi.get('customers?per_page=100')
@@ -72,9 +70,9 @@ class res_partner(models.Model):
                                              'type':'customer',
                                              'woo_instance_id':instance.id
                                             })
-                continue                                    
+                continue
             if response.status_code not in [200,201]:
-                message = "Error in Import Customers %s"%(response.content)                        
+                message = f"Error in Import Customers {response.content}"
                 transaction_log_obj.create(
                                     {'message':message,
                                      'mismatch_details':True,
@@ -108,22 +106,30 @@ class res_partner(models.Model):
                 if int(total_pages) >=2:
                     for page in range(2,int(total_pages)+1):            
                         customer_ids = customer_ids + self.import_all_woo_coustomers(wcapi, instance, transaction_log_obj, page)
-            
+
             billing = ''
             shipping = ''
             woo_customers = []
-            
-            if instance.woo_version == 'old':                
-                woo_customers = customer_ids
-                billing="billing_address"
-                shipping="shipping_address"
-            elif instance.woo_version == 'new':
+
+            if instance.woo_version == 'new':
                 woo_customers = customer_ids
                 billing="billing"
                 shipping="shipping"
-          
+
+            elif instance.woo_version == 'old':
+                woo_customers = customer_ids
+                billing="billing_address"
+                shipping="shipping_address"
             for customer in woo_customers:
-                woo_customer_id = customer.get('id',False)                
-                partner=customer.get(billing,False) and sale_order_obj.create_or_update_woo_customer(woo_customer_id,customer.get(billing), False, False,False,instance)
-                if partner:
+                woo_customer_id = customer.get('id',False)
+                if partner := customer.get(
+                    billing, False
+                ) and sale_order_obj.create_or_update_woo_customer(
+                    woo_customer_id,
+                    customer.get(billing),
+                    False,
+                    False,
+                    False,
+                    instance,
+                ):
                     customer.get(shipping,False) and sale_order_obj.create_or_update_woo_customer(False,customer.get(shipping),False,partner.id,'delivery',instance)

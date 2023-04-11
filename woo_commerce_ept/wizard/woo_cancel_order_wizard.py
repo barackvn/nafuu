@@ -60,15 +60,15 @@ class woo_cancel_order_wizard(models.TransientModel):
             active_id=self._context.get('active_id')
         picking=self.env['stock.picking'].browse(active_id)
         instance=picking.woo_instance_id
-        
+
         wcapi = instance.connect_in_woo()
         info = {'status': 'cancelled'}
         data = info
         if instance.woo_version == 'old':
             data = {'order':info}
-            response = wcapi.put('orders/%s'%(picking.sale_id.woo_order_id),data)
+            response = wcapi.put(f'orders/{picking.sale_id.woo_order_id}', data)
         else:
-            info.update({'id':picking.sale_id.woo_order_id})
+            info['id'] = picking.sale_id.woo_order_id
             response = wcapi.post('orders/batch',{'update':[info]})
         if not isinstance(response,requests.models.Response):               
             transaction_log_obj.create({'message': "Cancel Order \nResponse is not in proper format :: %s"%(response),
@@ -79,11 +79,13 @@ class woo_cancel_order_wizard(models.TransientModel):
             return True
         if response.status_code not in [200,201]:
             transaction_log_obj.create(
-                                {'message':"Error in Cancel Order %s"%(response.content),
-                                 'mismatch_details':True,
-                                 'type':'sales',
-                                 'woo_instance_id':instance.id
-                                })
+                {
+                    'message': f"Error in Cancel Order {response.content}",
+                    'mismatch_details': True,
+                    'type': 'sales',
+                    'woo_instance_id': instance.id,
+                }
+            )
             return True
         try:
             result = response.json()
@@ -95,15 +97,16 @@ class woo_cancel_order_wizard(models.TransientModel):
                 })
             return False
         if instance.woo_version == 'old':
-            errors = result.get('errors','')
-            if errors:
+            if errors := result.get('errors', ''):
                 message = errors[0].get('message')
                 transaction_log_obj.create(
-                                            {'message':"Error in Cancel Order, %s"%(message),
-                                             'mismatch_details':True,
-                                             'type':'sales',
-                                             'woo_instance_id':instance.id
-                                            })
+                    {
+                        'message': f"Error in Cancel Order, {message}",
+                        'mismatch_details': True,
+                        'type': 'sales',
+                        'woo_instance_id': instance.id,
+                    }
+                )
             else:
                 if self.auto_create_refund:
                     self.create_refund(picking.sale_id, picking)
@@ -111,7 +114,7 @@ class woo_cancel_order_wizard(models.TransientModel):
         elif instance.woo_version == 'new':            
             if self.auto_create_refund:
                 self.create_refund(picking.sale_id, picking)
-            picking.write({'canceled_in_woo':True})              
+            picking.write({'canceled_in_woo':True})
         return True           
 
     @api.multi
